@@ -9,6 +9,7 @@ from mininet.log import setLogLevel, info
 
 from mqtt_traffic import start_mqtt_traffic, stop_mqtt_traffic
 from normal_traffic import start_normal_traffic, stop_normal_traffic
+from network_monitor import start_network_monitoring, stop_network_monitoring
 
 
 # Project root = the folder above topo/, so paths work no matter where you run from
@@ -94,9 +95,11 @@ def run():
 
     start_mqtt_traffic(hosts, cloud, SEED)
     start_normal_traffic(hosts, cloud, SEED)
+    start_network_monitoring(hosts, router)
 
     CLI(net)
 
+    stop_network_monitoring()
     stop_normal_traffic(hosts, cloud)
     stop_mqtt_traffic(hosts, cloud)
 

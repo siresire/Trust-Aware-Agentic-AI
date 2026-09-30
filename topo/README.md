@@ -33,6 +33,12 @@ sudo python3 topo/smart_home_topo.py
 Inside the `mininet>` prompt: `<device> <command>` runs a command inside a device,
 `sh <command>` runs it on the Kali machine, `exit` shuts everything down.
 
+## Settings
+
+| Setting | Where | Meaning |
+|---|---|---|
+| `SEED = 42` | `smart_home_topo.py` | Main seed; every device gets `device_seed(SEED, name)`. Same seed → same sequence of sizes, waits and payloads. |
+
 ## Topology
 
 ```
@@ -302,3 +308,39 @@ mininet> tv ss -ti dst 172.16.0.11 | grep -oE 'cwnd:[0-9]+|rtt:[0-9.]+'
 
 During the laptop flood the TV's TCP `rtt` jumps from ≈60 ms to hundreds of ms and its
 congestion window `cwnd` changes as TCP backs off — an early congestion signal.
+
+### Step 10: Random sizes, reproducible with a seed
+Burst sizes are now random within a range; each device's bash loop is seeded with
+`RANDOM=<device seed>`, where `device_seed(seed, name) = seed*1000 + sum(ord(c) for c in name)`
+(Python's `hash()` is not used because it changes between runs). MQTT sensors are seeded too.
+The TV stream has nothing random and is not seeded. Rate caps stay fixed.
+
+| Device | Size range | Rate cap |
+|---|---|---|
+| camera | 100–400 KB | 2 Mbit/s |
+| speaker | 30–200 KB | 1 Mbit/s |
+| phone | 100–1000 KB | 2 Mbit/s |
+| laptop | 200–2000 KB | 3 Mbit/s |
+
+Average load stays ≈ 2.8 Mbit/s. The seed fixes the *sequence* of sizes and waits, not
+exact timing: runs with the same seed are very similar, not bit-for-bit identical.
+
+| Command | What to check |
+|---|---|
+| start-up output | `Starting MQTT traffic (seed=42)`, `Starting normal (iperf) traffic (seed=42)` |
+| `sh grep -E 'phone\|laptop\|camera\|speaker' /tmp/normal_traffic.log \| cut -d, -f2,4` | Sizes vary within each range |
+| `sh grep lock /tmp/mqtt_received.log` | Seeded payloads (`battery=..`) still appear |
+| router upload over 10 s | Still ≈ 2,000–4,000 kbps |
+
+**Mini experiment: reproducibility**
+
+```
+# run 1
+mininet> sh sleep 60
+mininet> sh grep laptop /tmp/normal_traffic.log | cut -d, -f4 | head -3 > /tmp/run1_sizes.txt
+mininet> exit
+# run 2 (restart topo), then:
+mininet> sh sleep 60
+mininet> sh grep laptop /tmp/normal_traffic.log | cut -d, -f4 | head -3
+mininet> sh cat /tmp/run1_sizes.txt       # same sizes, same order
+```

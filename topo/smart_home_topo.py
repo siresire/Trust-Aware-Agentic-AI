@@ -1,8 +1,16 @@
+import os
+import time
+
 from mininet.net import Mininet
 from mininet.node import OVSSwitch, Node
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info
 from mininet.link import TCLink
+
+
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CAPTURE_DIR = os.path.join(PROJECT_ROOT, 'captures')
 
 
 class LinuxRouter(Node):
@@ -66,7 +74,26 @@ def run():
 
     info('*** Starting network\n')
     net.start()
+
+    info('*** Starting packet capture\n')
+    os.makedirs(CAPTURE_DIR, exist_ok=True)
+    stamp = time.strftime('%Y%m%d_%H%M%S')
+    lan_file = f'{CAPTURE_DIR}/lan_{stamp}.pcap'
+    wan_file = f'{CAPTURE_DIR}/wan_{stamp}.pcap'
+    router.cmd(f'tcpdump -i r-eth0 -U -Z root -w {lan_file} '
+               f'> {CAPTURE_DIR}/tcpdump_lan.log 2>&1 &')
+    router.cmd(f'tcpdump -i r-eth1 -U -Z root -w {wan_file} '
+               f'> {CAPTURE_DIR}/tcpdump_wan.log 2>&1 &')
+    info(f'*** LAN capture: {lan_file}\n')
+    info(f'*** WAN capture: {wan_file}\n')
+
+
     CLI(net)
+
+    info('*** Stopping packet capture\n')
+    router.cmd('pkill -INT -f "tcpdump -i r-eth"')
+    time.sleep(1)    # give tcpdump a moment to finish writing
+    
     info('*** Stopping network\n')
     net.stop()
 

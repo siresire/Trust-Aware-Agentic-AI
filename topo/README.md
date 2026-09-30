@@ -1,19 +1,34 @@
-# Trust-Aware Agentic AI for Smart-Home IoT Network Management
+# topo/ — The smart-home IoT network
 
-A Mininet smart-home IoT testbed for studying when an AI agent should (and should not)
-act on network-performance predictions, based on prediction confidence, device importance,
-and homeowner policy.
+This folder builds and runs the emulated smart-home network used by the
+Trust-Aware Agentic AI project: 10 IoT devices, a home switch, a Linux router,
+a WAN switch and a cloud host, with shaped links and packet capture.
 
-## Problem
+## Files
 
-Smart-home IoT devices (cameras, locks, doorbells, sensors, speakers, phones, TVs, laptops)
-share one home network and one internet uplink, so traffic from one device can degrade
-others. A model can predict this degradation, but acting on every prediction is unsafe:
-the action may hit an important device, break a homeowner rule, or not fix the problem.
-This project builds a trust-aware agent that acts only when the prediction is confident,
-the affected device matters, and the policy allows modifying the target device.
+| File | Role |
+|---|---|
+| `smart_home_topo.py` | Builds the network, starts packet capture, opens the `mininet>` prompt |
 
+## Requirements
 
+```bash
+apt install -y mininet openvswitch-switch iperf tcpdump
+systemctl enable --now openvswitch-switch
+```
+
+## Run
+
+Always from the project root:
+
+```bash
+cd /home/beast1/Documents/research/Trust-Aware-Agentic-AI
+sudo mn -c                          # clean up anything left from a previous run
+sudo python3 topo/smart_home_topo.py
+```
+
+Inside the `mininet>` prompt: `<device> <command>` runs a command inside a device,
+`sh <command>` runs it on the Kali machine, `exit` shuts everything down.
 
 ## Topology
 
@@ -22,29 +37,28 @@ the affected device matters, and the policy allows modifying the target device.
              home LAN 10.0.0.x/24                     r-eth0 .254 | r-eth1 .1      WAN 172.16.0.x/24
 ```
 
-| Device     | IP           | Device | IP           |
-|------------|--------------|--------|--------------|
-| camera     | 10.0.0.1     | light  | 10.0.0.6     |
-| doorbell   | 10.0.0.2     | plug   | 10.0.0.7     |
-| lock       | 10.0.0.3     | phone  | 10.0.0.8     |
-| thermostat | 10.0.0.4     | tv     | 10.0.0.9     |
-| speaker    | 10.0.0.5     | laptop | 10.0.0.10    |
+| Device     | IP        | Device | IP        |
+|------------|-----------|--------|-----------|
+| camera     | 10.0.0.1  | light  | 10.0.0.6  |
+| doorbell   | 10.0.0.2  | plug   | 10.0.0.7  |
+| lock       | 10.0.0.3  | phone  | 10.0.0.8  |
+| thermostat | 10.0.0.4  | tv     | 10.0.0.9  |
+| speaker    | 10.0.0.5  | laptop | 10.0.0.10 |
 | router     | 10.0.0.254 (r-eth0), 172.16.0.1 (r-eth1) | cloud | 172.16.0.11 |
 
-| Link           | Bandwidth | Delay | Loss |
-|----------------|-----------|-------|------|
-| device – s1    | 10 Mbit/s | 5 ms  | 0 %  |
-| router – s1    | 10 Mbit/s | 5 ms  | 0 %  |
-| router – s2    | 10 Mbit/s | 10 ms | 0 %  |
-| s2 – cloud     | 10 Mbit/s | 10 ms | 0 %  |
+| Link        | Bandwidth | Delay | Loss |
+|-------------|-----------|-------|------|
+| device – s1 | 10 Mbit/s | 5 ms  | 0 %  |
+| router – s1 | 10 Mbit/s | 5 ms  | 0 %  |
+| router – s2 | 10 Mbit/s | 10 ms | 0 %  |
+| s2 – cloud  | 10 Mbit/s | 10 ms | 0 %  |
 
 ---
 
+## Build log
 
 ### Step 1: Home LAN (10 IoT devices + switch s1)
 All devices on 10.0.0.x/24, connected through the standalone OVS switch `s1`.
-
-**Check it**
 
 | Command | What to check |
 |---|---|
@@ -58,8 +72,6 @@ All devices on 10.0.0.x/24, connected through the standalone OVS switch `s1`.
 `LinuxRouter` = a Mininet host with IP forwarding on (`net.ipv4.ip_forward=1`).
 Home side `r-eth0` = 10.0.0.254. Every device has `default via 10.0.0.254`.
 
-**Check it**
-
 | Command | What to check |
 |---|---|
 | `router ip addr show r-eth0` | `inet 10.0.0.254/24` |
@@ -71,8 +83,6 @@ Home side `r-eth0` = 10.0.0.254. Every device has `default via 10.0.0.254`.
 ### Step 3: WAN switch s2 and cloud
 Second subnet 172.16.0.x/24. Router WAN side `r-eth1` = 172.16.0.1; cloud = 172.16.0.11,
 `default via 172.16.0.1`.
-
-**Check it**
 
 | Command | What to check |
 |---|---|
@@ -95,8 +105,6 @@ mininet> lock ping -c 3 172.16.0.11        # works again
 `TCLink` enforces `bw`, `delay` and `loss` with Linux `tc`. At start-up each cable prints
 `(10.00Mbit 5ms delay 0.00000% loss)`, which confirms the shaping is on.
 
-**Check it**
-
 | Command | What to check |
 |---|---|
 | `lock ping -c 4 10.0.0.254` | About 20 ms |
@@ -110,8 +118,6 @@ mininet> lock ping -c 3 172.16.0.11        # works again
   between bandwidth and throughput.
 
 **Mini experiment: your first IoT victim**
-
-One device fills the shared link, and a different, innocent IoT device suffers.
 
 ```
 mininet> cloud iperf -s > /dev/null &
@@ -132,3 +138,29 @@ mininet> cloud kill %iperf
 A few devices can reliably saturate 10 Mbit/s while normal IoT traffic stays well below it,
 Mininet stays accurate at tens of Mbit/s (Handigol et al., CoNEXT 2012), and `loss=0`
 means every measured loss comes from real congestion.
+
+### Step 5: Packet capture (tcpdump)
+Two tcpdump processes on the router record every packet on the home side (`r-eth0`) and the
+internet side (`r-eth1`) into `captures/lan_<time>.pcap` and `captures/wan_<time>.pcap`.
+They start right after `net.start()` and are stopped with SIGINT before `net.stop()`.
+
+| Command | What to check |
+|---|---|
+| `lock ping -c 3 172.16.0.11` | Makes some traffic to capture |
+| `sh ls -lh captures` | `lan_XXXX.pcap`, `wan_XXXX.pcap`, sizes above 0 |
+| `sh tcpdump -n -r captures/lan_XXXX.pcap` | `10.0.0.3 > 172.16.0.11: ICMP echo request` and replies |
+| `sh tcpdump -n -r captures/wan_XXXX.pcap` | The same pings on the outside side |
+| `exit` | `Stopping packet capture` before `Stopping network` |
+
+After exiting: `chown -R beast1:beast1 captures` to open the files in Wireshark.
+
+**Mini experiment: what the router changes**
+
+```
+mininet> lock ping -c 1 172.16.0.11
+mininet> sh tcpdump -n -e -r captures/lan_XXXX.pcap icmp | tail -2
+mininet> sh tcpdump -n -e -r captures/wan_XXXX.pcap icmp | tail -2
+```
+
+Same IP addresses in both files (IP is end to end); different MAC addresses (MAC is one hop,
+and the router swaps them).

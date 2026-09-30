@@ -21,6 +21,7 @@ def run():
 
     info('*** Adding the home switch\n')
     s1 = net.addSwitch('s1', failMode='standalone')
+    s2 = net.addSwitch('s2', failMode='standalone')  # ISP / WAN side
 
     info('*** Adding the router\n')
     router = net.addHost('router', cls=LinuxRouter, ip=None)
@@ -43,6 +44,10 @@ def run():
     for name, ip in devices:
         hosts[name] = net.addHost(name, ip=ip, defaultRoute='via 10.0.0.254')
 
+    info('*** Adding the cloud (internet) host\n')
+    cloud = net.addHost('cloud', ip='172.16.0.11/24',
+                        defaultRoute='via 172.16.0.1')
+
     info('*** Plugging every device into s1\n')
     for name in hosts:
         net.addLink(hosts[name], s1)
@@ -51,6 +56,12 @@ def run():
     net.addLink(router, s1,
                 intfName1='r-eth0',
                 params1={'ip': '10.0.0.254/24'})
+
+    info('*** Connecting the router and the cloud to s2\n')
+    net.addLink(router, s2,
+                intfName1='r-eth1',
+                params1={'ip': '172.16.0.1/24'})
+    net.addLink(s2, cloud)
 
     info('*** Starting network\n')
     net.start()

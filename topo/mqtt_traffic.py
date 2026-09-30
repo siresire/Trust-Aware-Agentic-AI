@@ -26,6 +26,11 @@ MQTT_PROFILES = {
 }
 
 
+def device_seed(seed, name):
+    """A different but repeatable seed for each device."""
+    return seed * 1000 + sum(ord(c) for c in name)
+
+
 def start_mqtt_broker(cloud):
     """Start Mosquitto on the cloud and a subscriber that records every message."""
     info('*** Starting MQTT broker on cloud\n')
@@ -39,14 +44,14 @@ def start_mqtt_broker(cloud):
               f'-F "%U,%t,%p" > {MQTT_LOG} 2>&1 &')
 
 
-def start_mqtt_device(h, name, profile, log_file=LOG_FILE):
+def start_mqtt_device(h, name, profile, seed, log_file=LOG_FILE):
     """One IoT sensor that publishes forever, following its profile."""
     lo, hi = profile['interval']
     qos = profile['qos']
     payload = profile['payload']
     topic = f'home/{name}/telemetry'
     cmd = (
-        f'( sleep $(( RANDOM % 5 )); '
+        f'( RANDOM={seed}; sleep $(( RANDOM % 5 )); '
         f'while true; do '
         f'MSG="{payload}"; '
         f'mosquitto_pub -h {BROKER_IP} -p {MQTT_PORT} -q {qos} '
@@ -58,13 +63,13 @@ def start_mqtt_device(h, name, profile, log_file=LOG_FILE):
     h.cmd(cmd)
 
 
-def start_mqtt_traffic(hosts, cloud):
-    """Fresh logs, broker on the cloud, then the sensors."""
-    info('*** Starting MQTT traffic\n')
+def start_mqtt_traffic(hosts, cloud, seed):
+    """Fresh logs, broker on the cloud, then the sensors (each with its own seed)."""
+    info(f'*** Starting MQTT traffic (seed={seed})\n')
     cloud.cmd(f'rm -f {LOG_FILE} {MQTT_LOG}')          # fresh logs each run
     start_mqtt_broker(cloud)
     for name, profile in MQTT_PROFILES.items():
-        start_mqtt_device(hosts[name], name, profile)
+        start_mqtt_device(hosts[name], name, profile, device_seed(seed, name))
 
 
 def stop_mqtt_traffic(hosts, cloud):

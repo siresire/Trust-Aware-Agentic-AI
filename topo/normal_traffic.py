@@ -5,21 +5,21 @@ Used by smart_home_topo.py (MQTT sensors live in mqtt_traffic.py).
 
 from mininet.log import info
 
-from mqtt_traffic import LOG_FILE, BROKER_IP as CLOUD_IP
+from mqtt_traffic import LOG_FILE, BROKER_IP as CLOUD_IP, device_seed
 
 IPERF_PORT    = 5001                            # iperf's default port
 IPERF_UDP_LOG = '/tmp/iperf_udp_server.log'     # per-burst jitter / loss seen by the cloud
 IPERF_TCP_LOG = '/tmp/iperf_tcp_server.log'     # per-transfer results seen by the cloud
 
-# One profile per media device: how often, how much, how fast
+# One profile per media device: how often, how much (KB range), how fast
 UDP_PROFILES = {
-    'camera':  dict(interval=(20, 60), size='200K', rate='2M'),
-    'speaker': dict(interval=(15, 45), size='100K', rate='1M'),
+    'camera':  dict(interval=(20, 60), size=(100, 400), rate='2M'),
+    'speaker': dict(interval=(15, 45), size=(30, 200),  rate='1M'),
 }
 
 TCP_PROFILES = {
-    'phone':  dict(interval=(5, 30), size='500K', rate='2M'),
-    'laptop': dict(interval=(5, 20), size='1M',   rate='3M'),
+    'phone':  dict(interval=(5, 30), size=(100, 1000), rate='2M'),
+    'laptop': dict(interval=(5, 20), size=(200, 2000), rate='3M'),
 }
 
 STREAM_PROFILES = {
@@ -39,19 +39,20 @@ def start_iperf_tcp_server(cloud):
     cloud.cmd(f'iperf -s -p {IPERF_PORT} -y C > {IPERF_TCP_LOG} 2>&1 &')
 
 
-def start_burst_device(h, name, profile, proto, log_file=LOG_FILE):
-    """One IoT device that sends a UDP or TCP burst to the cloud at random intervals."""
+def start_burst_device(h, name, profile, proto, seed, log_file=LOG_FILE):
+    """One IoT device that sends UDP or TCP bursts of random (seeded) size."""
     lo, hi = profile['interval']
-    size = profile['size']
+    s_lo, s_hi = profile['size']
     rate = profile['rate']
     udp_flag = '-u' if proto == 'udp' else ''
     cmd = (
-        f'( sleep $(( RANDOM % 5 )); '
+        f'( RANDOM={seed}; sleep $(( RANDOM % 5 )); '
         f'while true; do '
+        f'SIZE=$(( {s_lo} + RANDOM % ({s_hi}-{s_lo}+1) ))K; '
         f'START=$(date +%s.%N); '
-        f'iperf -c {CLOUD_IP} -p {IPERF_PORT} {udp_flag} -n {size} -b {rate} '
+        f'iperf -c {CLOUD_IP} -p {IPERF_PORT} {udp_flag} -n $SIZE -b {rate} '
         f'> /dev/null 2>&1; '
-        f'echo "$START,{name},{proto},{size},burst" >> {log_file}; '
+        f'echo "$START,{name},{proto},$SIZE,burst" >> {log_file}; '
         f'sleep $(( {lo} + RANDOM % ({hi}-{lo}+1) )); '
         f'done ) &'
     )
@@ -72,16 +73,16 @@ def start_stream_device(h, name, profile, log_file=LOG_FILE):
     h.cmd(cmd)
 
 
-def start_normal_traffic(hosts, cloud):
-    """Receivers on the cloud first, then every iperf device."""
-    info('*** Starting normal (iperf) traffic\n')
+def start_normal_traffic(hosts, cloud, seed):
+    """Receivers on the cloud first, then every iperf device (each with its own seed)."""
+    info(f'*** Starting normal (iperf) traffic (seed={seed})\n')
     cloud.cmd(f'rm -f {IPERF_UDP_LOG} {IPERF_TCP_LOG}')   # fresh logs each run
     start_iperf_udp_server(cloud)
     start_iperf_tcp_server(cloud)
     for name, profile in UDP_PROFILES.items():
-        start_burst_device(hosts[name], name, profile, 'udp')
+        start_burst_device(hosts[name], name, profile, 'udp', device_seed(seed, name))
     for name, profile in TCP_PROFILES.items():
-        start_burst_device(hosts[name], name, profile, 'tcp')
+        start_burst_device(hosts[name], name, profile, 'tcp', device_seed(seed, name))
     for name, profile in STREAM_PROFILES.items():
         start_stream_device(hosts[name], name, profile)
 

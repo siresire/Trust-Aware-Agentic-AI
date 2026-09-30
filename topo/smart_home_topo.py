@@ -3,18 +3,19 @@ import time
 
 from mininet.net import Mininet
 from mininet.node import OVSSwitch, Node
+from mininet.link import TCLink
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info
-from mininet.link import TCLink
-
 
 from mqtt_traffic import start_mqtt_traffic, stop_mqtt_traffic
 from normal_traffic import start_normal_traffic, stop_normal_traffic
 
 
-
+# Project root = the folder above topo/, so paths work no matter where you run from
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CAPTURE_DIR = os.path.join(PROJECT_ROOT, 'captures')
+
+SEED = 42    # change this to generate a different (but repeatable) run
 
 
 class LinuxRouter(Node):
@@ -63,7 +64,7 @@ def run():
 
     info('*** Plugging every device into s1\n')
     for name in hosts:
-        net.addLink(hosts[name], s1,bw=10, delay='5ms', loss=0)
+        net.addLink(hosts[name], s1, bw=10, delay='5ms', loss=0)
 
     info('*** Plugging the router into s1\n')
     net.addLink(router, s1, bw=10, delay='5ms', loss=0,
@@ -71,7 +72,7 @@ def run():
                 params1={'ip': '10.0.0.254/24'})
 
     info('*** Connecting the router and the cloud to s2\n')
-    net.addLink(router, s2,bw=10, delay='10ms', loss=0,
+    net.addLink(router, s2, bw=10, delay='10ms', loss=0,
                 intfName1='r-eth1',
                 params1={'ip': '172.16.0.1/24'})
     net.addLink(s2, cloud, bw=10, delay='10ms', loss=0)
@@ -91,8 +92,8 @@ def run():
     info(f'*** LAN capture: {lan_file}\n')
     info(f'*** WAN capture: {wan_file}\n')
 
-    start_mqtt_traffic(hosts, cloud)
-    start_normal_traffic(hosts, cloud)
+    start_mqtt_traffic(hosts, cloud, SEED)
+    start_normal_traffic(hosts, cloud, SEED)
 
     CLI(net)
 

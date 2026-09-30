@@ -2,6 +2,7 @@ from mininet.net import Mininet
 from mininet.node import OVSSwitch, Node
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info
+from mininet.link import TCLink
 
 
 class LinuxRouter(Node):
@@ -17,7 +18,7 @@ class LinuxRouter(Node):
 
 
 def run():
-    net = Mininet(switch=OVSSwitch, controller=None)
+    net = Mininet(switch=OVSSwitch, link=TCLink, controller=None)
 
     info('*** Adding the home switch\n')
     s1 = net.addSwitch('s1', failMode='standalone')
@@ -50,18 +51,18 @@ def run():
 
     info('*** Plugging every device into s1\n')
     for name in hosts:
-        net.addLink(hosts[name], s1)
+        net.addLink(hosts[name], s1,bw=10, delay='5ms', loss=0)
 
     info('*** Plugging the router into s1\n')
-    net.addLink(router, s1,
+    net.addLink(router, s1, bw=10, delay='5ms', loss=0,
                 intfName1='r-eth0',
                 params1={'ip': '10.0.0.254/24'})
 
     info('*** Connecting the router and the cloud to s2\n')
-    net.addLink(router, s2,
+    net.addLink(router, s2,bw=10, delay='10ms', loss=0,
                 intfName1='r-eth1',
                 params1={'ip': '172.16.0.1/24'})
-    net.addLink(s2, cloud)
+    net.addLink(s2, cloud, bw=10, delay='10ms', loss=0)
 
     info('*** Starting network\n')
     net.start()

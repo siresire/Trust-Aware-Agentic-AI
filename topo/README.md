@@ -8,13 +8,15 @@ a WAN switch and a cloud host, with shaped links and packet capture.
 
 | File | Role |
 |---|---|
-| `smart_home_topo.py` | Builds the network, starts packet capture, opens the `mininet>` prompt |
+| `smart_home_topo.py` | Builds the network, starts packet capture and traffic, opens the `mininet>` prompt |
+| `mqtt_traffic.py` | MQTT broker (Mosquitto) on the cloud, recording subscriber, IoT sensor publishers |
 
 ## Requirements
 
 ```bash
-apt install -y mininet openvswitch-switch iperf tcpdump
+apt install -y mininet openvswitch-switch iperf tcpdump mosquitto mosquitto-clients
 systemctl enable --now openvswitch-switch
+systemctl disable --now mosquitto      # our broker runs inside the cloud host instead
 ```
 
 ## Run
@@ -54,6 +56,13 @@ Inside the `mininet>` prompt: `<device> <command>` runs a command inside a devic
 | s2 – cloud  | 10 Mbit/s | 10 ms | 0 %  |
 
 ---
+
+## Log files (written during a run)
+
+| File | Written by | Contents |
+|---|---|---|
+| `/tmp/normal_traffic.log` | device traffic loops | Every traffic event SENT: `time,device,protocol,size,kind` |
+| `/tmp/mqtt_received.log` | subscriber on cloud | Every MQTT message DELIVERED: `arrival_time,topic,payload` |
 
 ## Build log
 
@@ -164,3 +173,28 @@ mininet> sh tcpdump -n -e -r captures/wan_XXXX.pcap icmp | tail -2
 
 Same IP addresses in both files (IP is end to end); different MAC addresses (MAC is one hop,
 and the router swaps them).
+
+### Step 6: MQTT broker and one sensor (`mqtt_traffic.py`)
+Mosquitto runs on the cloud (port 1883, anonymous). A subscriber on `home/#` records every
+delivered message to `/tmp/mqtt_received.log`. The thermostat publishes `temp=<18..25>` to
+`home/thermostat/telemetry` with QoS 1 every 20–40 s and logs each send to
+`/tmp/normal_traffic.log`. Traffic starts after packet capture and stops before it.
+
+| Command | What to check |
+|---|---|
+| `cloud ss -ltn` | `0.0.0.0:1883` listening |
+| `lock mosquitto_pub -h 172.16.0.11 -t home/test -m hello` | Test message sent |
+| `sh cat /tmp/mqtt_received.log` | `...,home/test,hello` |
+| after ~1 min: `sh cat /tmp/normal_traffic.log` | `thermostat,mqtt,7B,burst` lines (sent) |
+| `sh cat /tmp/mqtt_received.log` | `home/thermostat/telemetry,temp=..` lines (arrived) |
+| `sh tcpdump -n -r captures/wan_XXXX.pcap port 1883 \| head -20` | MQTT packets 10.0.0.4 → 172.16.0.11.1883 |
+
+**Mini experiment: application-level delay**
+
+```
+mininet> sh tail -1 /tmp/normal_traffic.log
+mininet> sh tail -1 /tmp/mqtt_received.log
+```
+
+Arrival time minus sent time ≈ 0.15–0.2 s: TCP handshake + MQTT connect + publish,
+because each `mosquitto_pub` opens a new connection (like a battery-powered sensor).

@@ -8,6 +8,9 @@ from mininet.log import setLogLevel, info
 from mininet.link import TCLink
 
 
+from mqtt_traffic import start_mqtt_traffic, stop_mqtt_traffic
+
+
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CAPTURE_DIR = os.path.join(PROJECT_ROOT, 'captures')
@@ -87,13 +90,16 @@ def run():
     info(f'*** LAN capture: {lan_file}\n')
     info(f'*** WAN capture: {wan_file}\n')
 
+    start_mqtt_traffic(hosts, cloud)
 
     CLI(net)
+
+    stop_mqtt_traffic(hosts, cloud)
 
     info('*** Stopping packet capture\n')
     router.cmd('pkill -INT -f "tcpdump -i r-eth"')
     time.sleep(1)    # give tcpdump a moment to finish writing
-    
+
     info('*** Stopping network\n')
     net.stop()
 

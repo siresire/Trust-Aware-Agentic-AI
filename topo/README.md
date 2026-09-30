@@ -10,6 +10,7 @@ a WAN switch and a cloud host, with shaped links and packet capture.
 |---|---|
 | `smart_home_topo.py` | Builds the network, starts packet capture and traffic, opens the `mininet>` prompt |
 | `mqtt_traffic.py` | MQTT broker (Mosquitto) on the cloud, recording subscriber, IoT sensor publishers |
+| `normal_traffic.py` | iperf receivers on the cloud and iperf traffic for media / heavy devices |
 
 ## Requirements
 
@@ -63,6 +64,8 @@ Inside the `mininet>` prompt: `<device> <command>` runs a command inside a devic
 |---|---|---|
 | `/tmp/normal_traffic.log` | device traffic loops | Every traffic event SENT: `time,device,protocol,size,kind` |
 | `/tmp/mqtt_received.log` | subscriber on cloud | Every MQTT message DELIVERED: `arrival_time,topic,payload` |
+| `/tmp/iperf_udp_server.log` | iperf UDP server on cloud | One CSV line per UDP burst: bytes, rate, jitter, lost, total, loss % |
+| `/tmp/iperf_tcp_server.log` | iperf TCP server on cloud | One CSV line per finished TCP transfer (phone, laptop; TV when a stream ends) |
 
 ## Build log
 
@@ -225,3 +228,77 @@ doorbell 2–5, lock 1–3, light and plug ≈ 1 each.
 
 QoS 0 sensors tend to *lose* messages under congestion; QoS 1 sensors get *delayed*
 messages (retries) — two different degradation patterns.
+
+### Step 8: Media devices (`normal_traffic.py`)
+An iperf (v2) UDP server on the cloud (port 5001, CSV output) receives media bursts.
+Camera: 200 KB at 2 Mbit/s every 20–60 s. Speaker: 100 KB at 1 Mbit/s every 15–45 s.
+Each burst is logged to the shared `/tmp/normal_traffic.log` with its start time.
+Start order: capture → MQTT → iperf; stop order is the reverse.
+
+| Command | What to check |
+|---|---|
+| `cloud ss -lun` | UDP `0.0.0.0:5001` |
+| `cloud ss -ltn` | TCP `0.0.0.0:1883` (MQTT still running) |
+| after ~10 s: `sh grep udp /tmp/normal_traffic.log` | `camera,udp,200K,burst` and `speaker,udp,100K,burst` |
+| `sh cat /tmp/iperf_udp_server.log` | One CSV line per burst; jitter < 1 ms, 0 lost |
+| `sh cut -d, -f2,3 /tmp/normal_traffic.log \| sort \| uniq -c` | Counts per device and protocol |
+
+**Mini experiment: the camera as a victim**
+
+```
+mininet> cloud iperf -s -p 5001 > /dev/null &            # TCP receiver (until Step 9)
+mininet> sh tail -2 /tmp/iperf_udp_server.log
+mininet> laptop iperf -c 172.16.0.11 -t 60 > /dev/null &
+mininet> sh sleep 45; tail -3 /tmp/iperf_udp_server.log
+mininet> cloud kill %iperf
+```
+
+During the laptop upload the camera's bursts show rising jitter and lost packets:
+UDP does not resend, so those video frames are gone.
+
+### Step 9: Heavy devices and the TV stream (`normal_traffic.py`)
+An iperf TCP server on the cloud (port 5001) receives the TCP traffic. `start_burst_device`
+now handles both UDP and TCP bursts; `start_stream_device` keeps one continuous TCP stream
+alive (restarting it if it ends) and logs `sustained-start`.
+
+| Device | Pattern | Size | Cap | Protocol |
+|---|---|---|---|---|
+| phone | every 5–30 s | 500 KB | 2 Mbit/s | TCP |
+| laptop | every 5–20 s | 1 MB | 3 Mbit/s | TCP |
+| tv | continuous | stream | 2 Mbit/s | TCP |
+
+**Average offered load (evidence that normal traffic stays below capacity)**
+
+| Device | Average load |
+|---|---|
+| tv | 2.00 Mbit/s |
+| laptop | ≈ 0.55 Mbit/s |
+| phone | ≈ 0.21 Mbit/s |
+| camera + speaker | ≈ 0.07 Mbit/s |
+| MQTT sensors | ≈ 0 |
+| **Total** | **≈ 2.8 Mbit/s on a 10 Mbit/s link** |
+
+| Command | What to check |
+|---|---|
+| `cloud ss -ltn` | `:1883` and `:5001` |
+| `cloud ss -lun` | `:5001` |
+| `tv ss -tn` | One ESTAB connection to 172.16.0.11:5001 |
+| after ~1 min: `sh cut -d, -f2,3,5 /tmp/normal_traffic.log \| sort \| uniq -c` | phone/laptop tcp bursts, tv sustained-start, plus the others |
+| `sh tail -5 /tmp/iperf_tcp_server.log` | One line per finished phone/laptop transfer |
+| router upload over 10 s (see below) | ≈ 2,000–4,000 kbps, never near 10,000 |
+
+```
+mininet> router A=$(cat /sys/class/net/r-eth0/statistics/rx_bytes); sleep 10; B=$(cat /sys/class/net/r-eth0/statistics/rx_bytes); echo $(( (B-A)*8/10000 )) kbps
+```
+
+**Mini experiment: TCP backs off when the link fills**
+
+```
+mininet> tv ss -ti dst 172.16.0.11 | grep -oE 'cwnd:[0-9]+|rtt:[0-9.]+'
+mininet> laptop iperf -c 172.16.0.11 -t 30 -b 20M > /dev/null &
+mininet> sh sleep 10
+mininet> tv ss -ti dst 172.16.0.11 | grep -oE 'cwnd:[0-9]+|rtt:[0-9.]+'
+```
+
+During the laptop flood the TV's TCP `rtt` jumps from ≈60 ms to hundreds of ms and its
+congestion window `cwnd` changes as TCP backs off — an early congestion signal.

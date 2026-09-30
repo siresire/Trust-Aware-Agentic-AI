@@ -198,3 +198,30 @@ mininet> sh tail -1 /tmp/mqtt_received.log
 
 Arrival time minus sent time ≈ 0.15–0.2 s: TCP handshake + MQTT connect + publish,
 because each `mosquitto_pub` opens a new connection (like a battery-powered sensor).
+
+### Step 7: All MQTT sensors (profiles)
+Each MQTT sensor is described by a profile in `MQTT_PROFILES` (interval, QoS, payload).
+Every sensor waits a random 0–4 s at start, then publishes to `home/<device>/telemetry`.
+Payload fields are separated by `;` so the comma-separated logs stay intact.
+
+| Device | Every | Payload | QoS |
+|---|---|---|---|
+| thermostat | 20–40 s | `temp=18..25` | 0 |
+| lock | 120–300 s | `state=locked;battery=60..100` | 1 |
+| doorbell | 60–180 s | `event=motion` | 1 |
+| light | 300–600 s | `on=0/1;brightness=0..100` | 0 |
+| plug | 300–600 s | `on=1;power_w=0..1499` | 0 |
+
+| Command | What to check |
+|---|---|
+| after ~10 s: `sh cat /tmp/mqtt_received.log` | Five topics present |
+| `sh grep lock /tmp/mqtt_received.log` | `home/lock/telemetry,state=locked;battery=..` |
+| `sh cut -d, -f2 /tmp/normal_traffic.log \| sort \| uniq -c` | Messages sent per device |
+| `sh cut -d, -f2 /tmp/mqtt_received.log \| sort \| uniq -c` | Messages received per topic (same counts = 100 % delivery) |
+
+**Mini experiment: the uneven rhythm of a real home** — after ~5 min,
+`sh cut -d, -f2 /tmp/normal_traffic.log | sort | uniq -c` shows thermostat ≈ 10,
+doorbell 2–5, lock 1–3, light and plug ≈ 1 each.
+
+QoS 0 sensors tend to *lose* messages under congestion; QoS 1 sensors get *delayed*
+messages (retries) — two different degradation patterns.

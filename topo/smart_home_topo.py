@@ -9,6 +9,7 @@ from mininet.link import TCLink
 
 
 from mqtt_traffic import start_mqtt_traffic, stop_mqtt_traffic
+from normal_traffic import start_normal_traffic, stop_normal_traffic
 
 
 
@@ -91,9 +92,11 @@ def run():
     info(f'*** WAN capture: {wan_file}\n')
 
     start_mqtt_traffic(hosts, cloud)
+    start_normal_traffic(hosts, cloud)
 
     CLI(net)
 
+    stop_normal_traffic(hosts, cloud)
     stop_mqtt_traffic(hosts, cloud)
 
     info('*** Stopping packet capture\n')

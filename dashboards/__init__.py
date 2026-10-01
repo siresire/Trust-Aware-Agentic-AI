@@ -1,0 +1,1 @@
+"""dashboards package - live terminal viewers (read-only)."""

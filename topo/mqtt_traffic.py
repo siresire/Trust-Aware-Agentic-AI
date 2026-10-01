@@ -1,5 +1,6 @@
 """
 mqtt_traffic.py - MQTT broker on the cloud and IoT sensors publishing to it.
+Every message carries seq (counter) and ts (send time) for delivery measurements.
 Used by smart_home_topo.py.
 """
 
@@ -45,18 +46,20 @@ def start_mqtt_broker(cloud):
 
 
 def start_mqtt_device(h, name, profile, seed, log_file=LOG_FILE):
-    """One IoT sensor that publishes forever, following its profile."""
+    """One IoT sensor that publishes forever; every message carries seq and ts."""
     lo, hi = profile['interval']
     qos = profile['qos']
     payload = profile['payload']
     topic = f'home/{name}/telemetry'
     cmd = (
-        f'( RANDOM={seed}; sleep $(( RANDOM % 5 )); '
+        f'( RANDOM={seed}; SEQ=0; sleep $(( RANDOM % 5 )); '
         f'while true; do '
-        f'MSG="{payload}"; '
+        f'SEQ=$(( SEQ + 1 )); '
+        f'SENT=$(date +%s.%N); '
+        f'MSG="seq=$SEQ;ts=$SENT;{payload}"; '
         f'mosquitto_pub -h {BROKER_IP} -p {MQTT_PORT} -q {qos} '
         f'-t {topic} -m "$MSG" > /dev/null 2>&1; '
-        f'echo "$(date +%s.%N),{name},mqtt,${{#MSG}}B,burst" >> {log_file}; '
+        f'echo "$SENT,{name},mqtt,${{#MSG}}B,burst" >> {log_file}; '
         f'sleep $(( {lo} + RANDOM % ({hi}-{lo}+1) )); '
         f'done ) &'
     )

@@ -30,13 +30,14 @@ def start_device_monitor(node, label, iface, ping_dst=None, interval=INTERVAL,
             f'ping -c 3 -i 0.2 -W 1 {ping_dst} > {tmp} 2>&1 & '
             f'PING_PID=$!; '
         )
+        # Take only the numbers after "= min/avg/max/mdev", so a suffix such as
+        # ", pipe 2" (added by ping under congestion) can never break the CSV row.
         ping_read = (
             f'wait $PING_PID; '
             f'LOSS=$(grep -oP "[0-9.]+(?=% packet loss)" {tmp}); '
             f'RTT_LINE=$(grep rtt {tmp}); '
-            f'RTT_AVG=$(echo "$RTT_LINE" | cut -d/ -f5); '
-            f'RTT_MDEV=$(echo "$RTT_LINE" | cut -d/ -f7); '
-            f'RTT_MDEV=${{RTT_MDEV% ms}}; '
+            f'RTT_AVG=$(echo "$RTT_LINE" | grep -oP "= [0-9.]+/\\K[0-9.]+"); '
+            f'RTT_MDEV=$(echo "$RTT_LINE" | grep -oP "= [0-9.]+/[0-9.]+/[0-9.]+/\\K[0-9.]+"); '
         )
     else:
         ping_start = ''

@@ -25,10 +25,10 @@ def draw_params(event_type, rng):
     if event_type == 'C_BORDER':
         return dict(flooders=[rng.choice(ALLOWED_FLOODERS)],
                     rate_mbps=rng.randint(6, 12))
-    if event_type == 'F_WAN':
-        return dict(delay_ms=rng.randint(30, 80), loss_pct=rng.randint(1, 5))
-    if event_type == 'F_DEVLINK':
-        return dict(device=rng.choice(FAULT_DEVICES), loss_pct=rng.randint(5, 20))
+    if event_type == 'F_WAN':                  # calibrated in the pilot: visible but link not full
+        return dict(delay_ms=rng.randint(60, 150), loss_pct=rng.randint(3, 10))
+    if event_type == 'F_DEVLINK':              # calibrated in the pilot: clear loss on one device
+        return dict(device=rng.choice(FAULT_DEVICES), loss_pct=rng.randint(10, 30))
     raise ValueError(f'unknown event type {event_type}')
 
 

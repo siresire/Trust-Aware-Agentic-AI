@@ -1,43 +1,72 @@
 # topo/ — The smart-home IoT network
 
-This folder builds and runs the emulated smart-home network used by the
-Trust-Aware Agentic AI project: 10 IoT devices, a home switch, a Linux router,
-a WAN switch and a cloud host, with shaped links and packet capture.
+Emulated smart-home network for **Trust-Aware Agentic AI for Smart-Home IoT Network Management**.
+Ten IoT devices share one home switch, one Linux router and one 10 Mbit/s uplink to a cloud host.
+The folder generates realistic, seeded IoT traffic (MQTT sensors, UDP media, TCP bulk, a TV
+stream), measures every device at three layers every 2 s, and injects labelled events:
+congestion (where rate-limiting helps) and decoy faults (where it cannot).
 
 ## Files
 
 | File | Role |
 |---|---|
-| `smart_home_topo.py` | Builds the network, starts packet capture and traffic, opens the `mininet>` prompt |
-| `mqtt_traffic.py` | MQTT broker (Mosquitto) on the cloud, recording subscriber, IoT sensor publishers |
-| `normal_traffic.py` | iperf receivers on the cloud and iperf traffic for media / heavy devices |
+| `__init__.py` | Makes `topo/` importable from other folders |
+| `smart_home_topo.py` | Builds the network; starts/stops all services; interactive `mininet>` prompt with custom commands; port map |
+| `mqtt_traffic.py` | Mosquitto broker on the cloud, recording subscriber, MQTT sensors (seq + ts in every message) |
+| `normal_traffic.py` | iperf (v2) receivers on the cloud; UDP media bursts, TCP bursts, TV stream |
+| `network_monitor.py` | Per-device throughput, RTT, jitter, loss; both router sides; TCP internals |
+| `mqtt_delay.py` | Per-sensor MQTT delivery report (delay, missing, duplicates) — run in a second terminal |
+| `congestion.py` | Labelled congestion events (C_SEVERE, C_BORDER) from allowed devices only |
+| `faults.py` | Labelled decoy faults (F_WAN, F_DEVLINK) that rate-limiting cannot fix |
 
 ## Requirements
 
 ```bash
 apt install -y mininet openvswitch-switch iperf tcpdump mosquitto mosquitto-clients
 systemctl enable --now openvswitch-switch
-systemctl disable --now mosquitto      # our broker runs inside the cloud host instead
+systemctl disable --now mosquitto      # our broker runs inside the cloud host
 ```
+
+Use **iperf version 2**, not iperf3 (iperf3 serves one client at a time).
 
 ## Run
 
-Always from the project root:
+From the project root:
 
 ```bash
 cd /home/beast1/Documents/research/Trust-Aware-Agentic-AI
-sudo mn -c                          # clean up anything left from a previous run
-sudo python3 topo/smart_home_topo.py
+sudo mn -c
+sudo python3 topo/smart_home_topo.py                 # seed 42, packet capture on
+sudo python3 topo/smart_home_topo.py --seed 43 --no-pcap
 ```
 
-Inside the `mininet>` prompt: `<device> <command>` runs a command inside a device,
-`sh <command>` runs it on the Kali machine, `exit` shuts everything down.
+Second terminal (no sudo): `python3 topo/mqtt_delay.py` or `watch -n 5 python3 topo/mqtt_delay.py`.
 
-## Settings
+### Commands at the `mininet>` prompt
 
-| Setting | Where | Meaning |
-|---|---|---|
-| `SEED = 42` | `smart_home_topo.py` | Main seed; every device gets `device_seed(SEED, name)`. Same seed → same sequence of sizes, waits and payloads. |
+| Command | Effect |
+|---|---|
+| `<device> <cmd>` | Run a Linux command inside a device, e.g. `lock ping -c 3 172.16.0.11` |
+| `sh <cmd>` | Run a command on the Kali machine |
+| `congest [severe\|border]` | Start a random labelled congestion event |
+| `stopflood` | End a running congestion event early |
+| `fault [wan\|devlink]` | Start a random labelled decoy fault |
+| `stopfault` | End a running fault early (cable restored) |
+| `exit` | Stop everything cleanly |
+
+Events never overlap: a new event is refused while one is running.
+
+### Use from other folders
+
+```python
+from topo.smart_home_topo import DEVICES, build_network, start_services, stop_services
+net, hosts, cloud, router = build_network()
+net.start()
+start_services(net, hosts, cloud, router, seed=42, pcap=False)
+...
+stop_services(hosts, cloud, router, pcap=False)
+net.stop()
+```
 
 ## Topology
 
@@ -46,301 +75,239 @@ Inside the `mininet>` prompt: `<device> <command>` runs a command inside a devic
              home LAN 10.0.0.x/24                     r-eth0 .254 | r-eth1 .1      WAN 172.16.0.x/24
 ```
 
-| Device     | IP        | Device | IP        |
-|------------|-----------|--------|-----------|
-| camera     | 10.0.0.1  | light  | 10.0.0.6  |
-| doorbell   | 10.0.0.2  | plug   | 10.0.0.7  |
-| lock       | 10.0.0.3  | phone  | 10.0.0.8  |
-| thermostat | 10.0.0.4  | tv     | 10.0.0.9  |
-| speaker    | 10.0.0.5  | laptop | 10.0.0.10 |
-| router     | 10.0.0.254 (r-eth0), 172.16.0.1 (r-eth1) | cloud | 172.16.0.11 |
+| Device | IP | Device | IP |
+|---|---|---|---|
+| camera | 10.0.0.1 | light | 10.0.0.6 |
+| doorbell | 10.0.0.2 | plug | 10.0.0.7 |
+| lock | 10.0.0.3 | phone | 10.0.0.8 |
+| thermostat | 10.0.0.4 | tv | 10.0.0.9 |
+| speaker | 10.0.0.5 | laptop | 10.0.0.10 |
+| router | 10.0.0.254 (r-eth0), 172.16.0.1 (r-eth1) | cloud | 172.16.0.11 |
 
-| Link        | Bandwidth | Delay | Loss |
-|-------------|-----------|-------|------|
-| device – s1 | 10 Mbit/s | 5 ms  | 0 %  |
-| router – s1 | 10 Mbit/s | 5 ms  | 0 %  |
-| router – s2 | 10 Mbit/s | 10 ms | 0 %  |
-| s2 – cloud  | 10 Mbit/s | 10 ms | 0 %  |
+| Link | Bandwidth | Delay | Loss |
+|---|---|---|---|
+| device – s1 | 10 Mbit/s | 5 ms | 0 % |
+| router – s1 | 10 Mbit/s | 5 ms | 0 % |
+| router – s2 | 10 Mbit/s | 10 ms | 0 % |
+| s2 – cloud | 10 Mbit/s | 10 ms | 0 % |
+
+Baseline RTT: ≈ 20 ms inside the home, ≈ 60 ms device → cloud.
+**Why these values:** a deliberate experimental choice, not a typical ISP plan — a few devices can
+reliably saturate 10 Mbit/s while normal traffic stays well below it; Mininet stays accurate at
+tens of Mbit/s (Handigol et al., CoNEXT 2012); `loss=0` means every measured loss is caused by
+congestion or a labelled fault.
+
+## Normal traffic (seeded)
+
+| Device | Protocol | Every | Size | Cap / QoS |
+|---|---|---|---|---|
+| thermostat | MQTT | 20–40 s | `temp=..` | QoS 0 |
+| lock | MQTT | 120–300 s | `state=locked;battery=..` | QoS 1 |
+| doorbell | MQTT | 60–180 s | `event=motion` | QoS 1 |
+| light | MQTT | 300–600 s | `on=..;brightness=..` | QoS 0 |
+| plug | MQTT | 300–600 s | `on=1;power_w=..` | QoS 0 |
+| camera | UDP | 20–60 s | 100–400 KB | 2 Mbit/s |
+| speaker | UDP | 15–45 s | 30–200 KB | 1 Mbit/s |
+| phone | TCP | 5–30 s | 100–1000 KB | 2 Mbit/s |
+| laptop | TCP | 5–20 s | 200–2000 KB | 3 Mbit/s |
+| tv | TCP | continuous | stream | 2 Mbit/s |
+
+MQTT messages carry `seq=<n>;ts=<send time>;...`. Each device's bash loop is seeded with
+`RANDOM=device_seed(seed, name)` where `device_seed = seed*1000 + sum(ord(c) for c in name)`.
+Same seed → same sequence of sizes, waits and payloads (not bit-identical timing).
+
+**Average offered load ≈ 2.8 Mbit/s on a 10 Mbit/s link** (tv 2.00, laptop ≈ 0.55, phone ≈ 0.21,
+camera + speaker ≈ 0.07, MQTT ≈ 0) — normal traffic stays well below capacity.
+
+## Measurements (every 2 s)
+
+| Layer | Values | Log |
+|---|---|---|
+| Network | rx/tx kbit/s, RTT, jitter (ping mdev), loss (3 pings, decimals kept) | `/tmp/network_metrics/<device>.log` |
+| Shared link | router home side (rx = all home uploads), internet side (tx = what leaves) | `/tmp/network_metrics/router_lan.log`, `router_wan.log` |
+| Transport | conns, cwnd, ssthresh, srtt, retrans_total, unacked (phone, laptop, tv) | `/tmp/tcp_metrics/<device>.log` |
+| Application | MQTT delivery delay, missing, duplicates | `/tmp/mqtt_received.log` (+ `mqtt_delay.py`) |
+| Raw packets | everything on both router sides | `captures/*.pcap` |
+
+Ping runs in the background *during* each 2 s window, and throughput divides by the measured
+window length. A ping reply slower than 1 s counts as lost.
+
+## Events (ground truth)
+
+| Type | Cause | Who suffers | Shared link | Rate-limiting helps? | should_act |
+|---|---|---|---|---|---|
+| C_SEVERE | 2–3 of laptop/phone/tv at 8–20 Mbit/s each | everyone | full | yes | yes |
+| C_BORDER | 1 of laptop/phone/tv at 6–12 Mbit/s | sometimes | 7–10 Mbit/s | often | yes |
+| F_WAN | WAN cable delay 30–80 ms, loss 1–5 % | everyone | **not** full | no | no |
+| F_DEVLINK | one IoT device's cable loss 5–20 % | that device only | normal | no | no |
+
+Durations 15–60 s. Only laptop, phone and tv may flood; protected devices (camera, lock,
+doorbell, thermostat, speaker, light, plug) never do. Every event writes a `start` and an
+`end` line with real times.
+
+## Log files
+
+| File | Contents |
+|---|---|
+| `/tmp/normal_traffic.log` | Every traffic event SENT: `time,device,protocol,size,kind` |
+| `/tmp/mqtt_received.log` | Every MQTT message DELIVERED: `arrival_time,topic,payload` |
+| `/tmp/iperf_udp_server.log` | One CSV line per UDP burst (bytes, rate, jitter, lost, total, loss %) |
+| `/tmp/iperf_tcp_server.log` | One CSV line per finished TCP transfer |
+| `/tmp/network_metrics/*.log` | `timestamp,device,rx_kbps,tx_kbps,rtt_ms,jitter_ms,loss_pct` |
+| `/tmp/tcp_metrics/*.log` | `timestamp,device,conns,cwnd,ssthresh,srtt_ms,retrans_total,unacked` |
+| `/tmp/events.log` | `timestamp,event_id,event_type,device,params,duration_s,phase` |
+| `/tmp/port_map.json` | IoT device → s1 port, e.g. `{"laptop": "s1-eth10"}` |
+
+Start order: capture → MQTT → iperf → monitoring → event logs → port map.
+Stop order: events → monitoring → iperf → MQTT → capture → network.
 
 ---
 
-## Log files (written during a run)
-
-| File | Written by | Contents |
-|---|---|---|
-| `/tmp/normal_traffic.log` | device traffic loops | Every traffic event SENT: `time,device,protocol,size,kind` |
-| `/tmp/mqtt_received.log` | subscriber on cloud | Every MQTT message DELIVERED: `arrival_time,topic,payload` |
-| `/tmp/iperf_udp_server.log` | iperf UDP server on cloud | One CSV line per UDP burst: bytes, rate, jitter, lost, total, loss % |
-| `/tmp/iperf_tcp_server.log` | iperf TCP server on cloud | One CSV line per finished TCP transfer (phone, laptop; TV when a stream ends) |
-
 ## Build log
 
-### Step 1: Home LAN (10 IoT devices + switch s1)
-All devices on 10.0.0.x/24, connected through the standalone OVS switch `s1`.
-
-| Command | What to check |
+### Step 1 — Home LAN (10 IoT devices + s1)
+| Command | Expected |
 |---|---|
-| `nodes` | Ten devices plus `s1` |
-| `net` | Each device has one cable (`-eth0`) to s1 |
-| `lock ifconfig` | IP is `10.0.0.3` |
-| `camera ping -c 3 laptop` | Two home devices talk through s1, 0 % loss |
-| `pingall` | `0% dropped (90/90 received)` |
+| `nodes` | 10 devices + s1 |
+| `lock ifconfig` | 10.0.0.3 |
+| `pingall` | 0 % dropped (90/90) |
 
-### Step 2: The router
-`LinuxRouter` = a Mininet host with IP forwarding on (`net.ipv4.ip_forward=1`).
-Home side `r-eth0` = 10.0.0.254. Every device has `default via 10.0.0.254`.
-
-| Command | What to check |
+### Step 2 — The router
+`LinuxRouter` turns on `net.ipv4.ip_forward`; devices use `default via 10.0.0.254`.
+| Command | Expected |
 |---|---|
-| `router ip addr show r-eth0` | `inet 10.0.0.254/24` |
-| `router sysctl net.ipv4.ip_forward` | `= 1` |
-| `lock ip route` | `default via 10.0.0.254` |
-| `lock ping -c 3 10.0.0.254` | Lock reaches the router |
-| `pingall` | `0% dropped (110/110 received)` |
+| `router sysctl net.ipv4.ip_forward` | = 1 |
+| `lock ip route` | default via 10.0.0.254 |
+| `pingall` | 0 % dropped (110/110) |
 
-### Step 3: WAN switch s2 and cloud
-Second subnet 172.16.0.x/24. Router WAN side `r-eth1` = 172.16.0.1; cloud = 172.16.0.11,
-`default via 172.16.0.1`.
-
-| Command | What to check |
+### Step 3 — WAN switch s2 and cloud
+| Command | Expected |
 |---|---|
-| `router ip addr` | Two IPs: 10.0.0.254 and 172.16.0.1 |
-| `cloud ip route` | `default via 172.16.0.1` |
-| `lock ping -c 3 172.16.0.11` | Lock reaches the cloud through the router |
-| `lock tracepath -n 172.16.0.11` | Via 10.0.0.254, then 172.16.0.11 |
-| `pingall` | `0% dropped (132/132 received)` |
+| `router ip addr` | 10.0.0.254 and 172.16.0.1 |
+| `lock ping -c 3 172.16.0.11` | reaches the cloud |
+| `pingall` | 0 % dropped (132/132) |
 
-**Mini experiment: the router does the work**
+Mini experiment: `router sysctl -w net.ipv4.ip_forward=0` → `lock ping -c 3 172.16.0.11` fails;
+set it back to 1 → works.
 
-```
-mininet> router sysctl -w net.ipv4.ip_forward=0
-mininet> lock ping -c 3 172.16.0.11        # fails
-mininet> router sysctl -w net.ipv4.ip_forward=1
-mininet> lock ping -c 3 172.16.0.11        # works again
-```
-
-### Step 4: Realistic cables (bandwidth, delay, loss)
-`TCLink` enforces `bw`, `delay` and `loss` with Linux `tc`. At start-up each cable prints
-`(10.00Mbit 5ms delay 0.00000% loss)`, which confirms the shaping is on.
-
-| Command | What to check |
+### Step 4 — Realistic cables
+| Command | Expected |
 |---|---|
-| `lock ping -c 4 10.0.0.254` | About 20 ms |
-| `lock ping -c 4 10.0.0.10` | About 20 ms |
-| `lock ping -c 4 172.16.0.11` | About 60 ms |
-| `iperf laptop cloud` | About 9 to 9.5 Mbit/s, just under the 10 Mbit limit |
-| `pingall` | Still `0% dropped (132/132 received)` |
+| `lock ping -c 4 10.0.0.254` | ≈ 20 ms |
+| `lock ping -c 4 172.16.0.11` | ≈ 60 ms |
+| `iperf laptop cloud` | ≈ 9–9.5 Mbit/s |
 
-- The first ping of each run can be slower because of ARP (looking up the next device's MAC address).
-- iperf lands a little below 10 because of packet headers and TCP overhead: the difference
-  between bandwidth and throughput.
-
-**Mini experiment: your first IoT victim**
-
+Mini experiment (first IoT victim):
 ```
 mininet> cloud iperf -s > /dev/null &
-mininet> lock ping -c 5 172.16.0.11                    # before: ~60 ms
 mininet> laptop iperf -c 172.16.0.11 -t 20 > /dev/null &
-mininet> lock ping -c 10 172.16.0.11                   # during: RTT jumps far above 60 ms
+mininet> lock ping -c 10 172.16.0.11        # RTT far above 60 ms
 mininet> cloud kill %iperf
 ```
 
-| Line | Meaning |
+### Step 5 — Packet capture
+| Command | Expected |
 |---|---|
-| `cloud iperf -s ... &` | A receiver on the cloud, running in the background |
-| `laptop iperf -c ... -t 20` | The laptop uploads as fast as it can for 20 s, filling the 10 Mbit link |
-| `lock ping` during the upload | The lock sent almost nothing, yet its delay rises: its packets wait in a queue behind the laptop's |
-| `cloud kill %iperf` | Stop the receiver |
+| `sh ls -lh captures` | lan_*.pcap, wan_*.pcap |
+| `sh tcpdump -n -r captures/lan_XXXX.pcap` | 10.0.0.3 > 172.16.0.11 ICMP |
 
-**Why these link values:** a deliberate experimental choice, not a typical ISP plan.
-A few devices can reliably saturate 10 Mbit/s while normal IoT traffic stays well below it,
-Mininet stays accurate at tens of Mbit/s (Handigol et al., CoNEXT 2012), and `loss=0`
-means every measured loss comes from real congestion.
+Mini experiment: `tcpdump -n -e` on both files — same IPs, different MACs (router swaps them).
 
-### Step 5: Packet capture (tcpdump)
-Two tcpdump processes on the router record every packet on the home side (`r-eth0`) and the
-internet side (`r-eth1`) into `captures/lan_<time>.pcap` and `captures/wan_<time>.pcap`.
-They start right after `net.start()` and are stopped with SIGINT before `net.stop()`.
-
-| Command | What to check |
+### Step 6–7 — MQTT broker and sensors
+| Command | Expected |
 |---|---|
-| `lock ping -c 3 172.16.0.11` | Makes some traffic to capture |
-| `sh ls -lh captures` | `lan_XXXX.pcap`, `wan_XXXX.pcap`, sizes above 0 |
-| `sh tcpdump -n -r captures/lan_XXXX.pcap` | `10.0.0.3 > 172.16.0.11: ICMP echo request` and replies |
-| `sh tcpdump -n -r captures/wan_XXXX.pcap` | The same pings on the outside side |
-| `exit` | `Stopping packet capture` before `Stopping network` |
+| `cloud ss -ltn` | :1883 |
+| after ~10 s `sh cat /tmp/mqtt_received.log` | five `home/<sensor>/telemetry` topics |
+| `sh cut -d, -f2 /tmp/normal_traffic.log \| sort \| uniq -c` vs same on `mqtt_received.log` | same counts (100 % delivery) |
 
-After exiting: `chown -R beast1:beast1 captures` to open the files in Wireshark.
+QoS 0 sensors tend to lose messages under congestion; QoS 1 sensors get delayed (retries).
 
-**Mini experiment: what the router changes**
-
-```
-mininet> lock ping -c 1 172.16.0.11
-mininet> sh tcpdump -n -e -r captures/lan_XXXX.pcap icmp | tail -2
-mininet> sh tcpdump -n -e -r captures/wan_XXXX.pcap icmp | tail -2
-```
-
-Same IP addresses in both files (IP is end to end); different MAC addresses (MAC is one hop,
-and the router swaps them).
-
-### Step 6: MQTT broker and one sensor (`mqtt_traffic.py`)
-Mosquitto runs on the cloud (port 1883, anonymous). A subscriber on `home/#` records every
-delivered message to `/tmp/mqtt_received.log`. The thermostat publishes `temp=<18..25>` to
-`home/thermostat/telemetry` with QoS 1 every 20–40 s and logs each send to
-`/tmp/normal_traffic.log`. Traffic starts after packet capture and stops before it.
-
-| Command | What to check |
+### Step 8–9 — Media, heavy devices, TV stream
+| Command | Expected |
 |---|---|
-| `cloud ss -ltn` | `0.0.0.0:1883` listening |
-| `lock mosquitto_pub -h 172.16.0.11 -t home/test -m hello` | Test message sent |
-| `sh cat /tmp/mqtt_received.log` | `...,home/test,hello` |
-| after ~1 min: `sh cat /tmp/normal_traffic.log` | `thermostat,mqtt,7B,burst` lines (sent) |
-| `sh cat /tmp/mqtt_received.log` | `home/thermostat/telemetry,temp=..` lines (arrived) |
-| `sh tcpdump -n -r captures/wan_XXXX.pcap port 1883 \| head -20` | MQTT packets 10.0.0.4 → 172.16.0.11.1883 |
-
-**Mini experiment: application-level delay**
-
-```
-mininet> sh tail -1 /tmp/normal_traffic.log
-mininet> sh tail -1 /tmp/mqtt_received.log
-```
-
-Arrival time minus sent time ≈ 0.15–0.2 s: TCP handshake + MQTT connect + publish,
-because each `mosquitto_pub` opens a new connection (like a battery-powered sensor).
-
-### Step 7: All MQTT sensors (profiles)
-Each MQTT sensor is described by a profile in `MQTT_PROFILES` (interval, QoS, payload).
-Every sensor waits a random 0–4 s at start, then publishes to `home/<device>/telemetry`.
-Payload fields are separated by `;` so the comma-separated logs stay intact.
-
-| Device | Every | Payload | QoS |
-|---|---|---|---|
-| thermostat | 20–40 s | `temp=18..25` | 0 |
-| lock | 120–300 s | `state=locked;battery=60..100` | 1 |
-| doorbell | 60–180 s | `event=motion` | 1 |
-| light | 300–600 s | `on=0/1;brightness=0..100` | 0 |
-| plug | 300–600 s | `on=1;power_w=0..1499` | 0 |
-
-| Command | What to check |
-|---|---|
-| after ~10 s: `sh cat /tmp/mqtt_received.log` | Five topics present |
-| `sh grep lock /tmp/mqtt_received.log` | `home/lock/telemetry,state=locked;battery=..` |
-| `sh cut -d, -f2 /tmp/normal_traffic.log \| sort \| uniq -c` | Messages sent per device |
-| `sh cut -d, -f2 /tmp/mqtt_received.log \| sort \| uniq -c` | Messages received per topic (same counts = 100 % delivery) |
-
-**Mini experiment: the uneven rhythm of a real home** — after ~5 min,
-`sh cut -d, -f2 /tmp/normal_traffic.log | sort | uniq -c` shows thermostat ≈ 10,
-doorbell 2–5, lock 1–3, light and plug ≈ 1 each.
-
-QoS 0 sensors tend to *lose* messages under congestion; QoS 1 sensors get *delayed*
-messages (retries) — two different degradation patterns.
-
-### Step 8: Media devices (`normal_traffic.py`)
-An iperf (v2) UDP server on the cloud (port 5001, CSV output) receives media bursts.
-Camera: 200 KB at 2 Mbit/s every 20–60 s. Speaker: 100 KB at 1 Mbit/s every 15–45 s.
-Each burst is logged to the shared `/tmp/normal_traffic.log` with its start time.
-Start order: capture → MQTT → iperf; stop order is the reverse.
-
-| Command | What to check |
-|---|---|
-| `cloud ss -lun` | UDP `0.0.0.0:5001` |
-| `cloud ss -ltn` | TCP `0.0.0.0:1883` (MQTT still running) |
-| after ~10 s: `sh grep udp /tmp/normal_traffic.log` | `camera,udp,200K,burst` and `speaker,udp,100K,burst` |
-| `sh cat /tmp/iperf_udp_server.log` | One CSV line per burst; jitter < 1 ms, 0 lost |
-| `sh cut -d, -f2,3 /tmp/normal_traffic.log \| sort \| uniq -c` | Counts per device and protocol |
-
-**Mini experiment: the camera as a victim**
-
-```
-mininet> cloud iperf -s -p 5001 > /dev/null &            # TCP receiver (until Step 9)
-mininet> sh tail -2 /tmp/iperf_udp_server.log
-mininet> laptop iperf -c 172.16.0.11 -t 60 > /dev/null &
-mininet> sh sleep 45; tail -3 /tmp/iperf_udp_server.log
-mininet> cloud kill %iperf
-```
-
-During the laptop upload the camera's bursts show rising jitter and lost packets:
-UDP does not resend, so those video frames are gone.
-
-### Step 9: Heavy devices and the TV stream (`normal_traffic.py`)
-An iperf TCP server on the cloud (port 5001) receives the TCP traffic. `start_burst_device`
-now handles both UDP and TCP bursts; `start_stream_device` keeps one continuous TCP stream
-alive (restarting it if it ends) and logs `sustained-start`.
-
-| Device | Pattern | Size | Cap | Protocol |
-|---|---|---|---|---|
-| phone | every 5–30 s | 500 KB | 2 Mbit/s | TCP |
-| laptop | every 5–20 s | 1 MB | 3 Mbit/s | TCP |
-| tv | continuous | stream | 2 Mbit/s | TCP |
-
-**Average offered load (evidence that normal traffic stays below capacity)**
-
-| Device | Average load |
-|---|---|
-| tv | 2.00 Mbit/s |
-| laptop | ≈ 0.55 Mbit/s |
-| phone | ≈ 0.21 Mbit/s |
-| camera + speaker | ≈ 0.07 Mbit/s |
-| MQTT sensors | ≈ 0 |
-| **Total** | **≈ 2.8 Mbit/s on a 10 Mbit/s link** |
-
-| Command | What to check |
-|---|---|
-| `cloud ss -ltn` | `:1883` and `:5001` |
-| `cloud ss -lun` | `:5001` |
-| `tv ss -tn` | One ESTAB connection to 172.16.0.11:5001 |
-| after ~1 min: `sh cut -d, -f2,3,5 /tmp/normal_traffic.log \| sort \| uniq -c` | phone/laptop tcp bursts, tv sustained-start, plus the others |
-| `sh tail -5 /tmp/iperf_tcp_server.log` | One line per finished phone/laptop transfer |
-| router upload over 10 s (see below) | ≈ 2,000–4,000 kbps, never near 10,000 |
+| `cloud ss -lun` / `cloud ss -ltn` | UDP :5001 / TCP :1883 and :5001 |
+| `tv ss -tn` | one ESTAB connection to 172.16.0.11:5001 |
+| `sh cat /tmp/iperf_udp_server.log` | one line per burst, jitter < 1 ms, 0 lost |
+| router upload over 10 s | ≈ 2,000–4,000 kbps |
 
 ```
 mininet> router A=$(cat /sys/class/net/r-eth0/statistics/rx_bytes); sleep 10; B=$(cat /sys/class/net/r-eth0/statistics/rx_bytes); echo $(( (B-A)*8/10000 )) kbps
 ```
 
-**Mini experiment: TCP backs off when the link fills**
-
-```
-mininet> tv ss -ti dst 172.16.0.11 | grep -oE 'cwnd:[0-9]+|rtt:[0-9.]+'
-mininet> laptop iperf -c 172.16.0.11 -t 30 -b 20M > /dev/null &
-mininet> sh sleep 10
-mininet> tv ss -ti dst 172.16.0.11 | grep -oE 'cwnd:[0-9]+|rtt:[0-9.]+'
-```
-
-During the laptop flood the TV's TCP `rtt` jumps from ≈60 ms to hundreds of ms and its
-congestion window `cwnd` changes as TCP backs off — an early congestion signal.
-
-### Step 10: Random sizes, reproducible with a seed
-Burst sizes are now random within a range; each device's bash loop is seeded with
-`RANDOM=<device seed>`, where `device_seed(seed, name) = seed*1000 + sum(ord(c) for c in name)`
-(Python's `hash()` is not used because it changes between runs). MQTT sensors are seeded too.
-The TV stream has nothing random and is not seeded. Rate caps stay fixed.
-
-| Device | Size range | Rate cap |
-|---|---|---|
-| camera | 100–400 KB | 2 Mbit/s |
-| speaker | 30–200 KB | 1 Mbit/s |
-| phone | 100–1000 KB | 2 Mbit/s |
-| laptop | 200–2000 KB | 3 Mbit/s |
-
-Average load stays ≈ 2.8 Mbit/s. The seed fixes the *sequence* of sizes and waits, not
-exact timing: runs with the same seed are very similar, not bit-for-bit identical.
-
-| Command | What to check |
+### Step 10 — Random sizes, reproducible seed
+| Command | Expected |
 |---|---|
-| start-up output | `Starting MQTT traffic (seed=42)`, `Starting normal (iperf) traffic (seed=42)` |
-| `sh grep -E 'phone\|laptop\|camera\|speaker' /tmp/normal_traffic.log \| cut -d, -f2,4` | Sizes vary within each range |
-| `sh grep lock /tmp/mqtt_received.log` | Seeded payloads (`battery=..`) still appear |
-| router upload over 10 s | Still ≈ 2,000–4,000 kbps |
+| start-up | `(seed=42)` in both traffic lines |
+| `sh grep laptop /tmp/normal_traffic.log \| cut -d, -f4 \| head -3` | same 3 sizes in two runs with the same seed |
 
-**Mini experiment: reproducibility**
+### Step 11–12 — Throughput, RTT, jitter, loss
+| Command | Expected |
+|---|---|
+| `sh ls /tmp/network_metrics` | 12 `.log` files |
+| `sh column -s, -t < /tmp/network_metrics/camera.log \| tail -5` | rtt ≈ 60, jitter < 1, loss 0 |
+| `sh column -s, -t < /tmp/network_metrics/router_lan.log \| tail -5` | rx ≈ 2000–4000; ping columns NA |
+| `sh tail -4 /tmp/network_metrics/tv.log \| cut -d, -f1` | rows ≈ 2 s apart |
 
-```
-# run 1
-mininet> sh sleep 60
-mininet> sh grep laptop /tmp/normal_traffic.log | cut -d, -f4 | head -3 > /tmp/run1_sizes.txt
-mininet> exit
-# run 2 (restart topo), then:
-mininet> sh sleep 60
-mininet> sh grep laptop /tmp/normal_traffic.log | cut -d, -f4 | head -3
-mininet> sh cat /tmp/run1_sizes.txt       # same sizes, same order
-```
+During a flood, the lock (≈ 0 kbps) shows RTT in the hundreds of ms and loss such as 33.3333
+(never 3333), while router_lan rx ≈ 10,000.
+
+Normal operation also contains short blips (microbursts from TCP, 1-of-3 ping lost). They are
+real, expected, and are why degradation thresholds come from normal-only data, not fixed values.
+
+### Step 13 — TCP internals
+| Command | Expected |
+|---|---|
+| `sh ls /tmp/tcp_metrics` | laptop.log phone.log tv.log |
+| `sh column -s, -t < /tmp/tcp_metrics/tv.log \| tail -5` | conns 1, srtt ≈ 60–65, retrans small |
+
+During a flood the TV's srtt rises, retrans_total climbs, cwnd drops — often at the same time as or
+before the throughput drop (early warning).
+
+### Step 14 — MQTT delivery delay
+| Command | Expected |
+|---|---|
+| `python3 topo/mqtt_delay.py` | five sensors, MISSING 0, DUPS 0, AVG ≈ 150–200 ms |
+
+≈ 150–200 ms baseline because each `mosquitto_pub` opens a new connection (TCP handshake +
+MQTT connect + publish), like a battery-powered sensor. One-way delay relies on all hosts
+sharing one clock.
+
+### Step 15 — Labelled congestion
+| Command | Expected |
+|---|---|
+| `congest severe` | event printed; start lines in `/tmp/events.log` |
+| `congest` during an event | refused (no overlap) |
+| `stopflood` | end line written early |
+| `sh grep -cE ',(camera\|lock\|doorbell\|thermostat\|speaker\|light\|plug),' /tmp/events.log` | 0 |
+
+### Step 16 — Decoy faults
+| Command | Expected |
+|---|---|
+| `fault wan` then `router tc qdisc show dev r-eth1` | delay 30–80 ms, loss 1–5 % |
+| after the event | back to delay 10 ms, no loss |
+| `fault devlink` | loss only on that one device |
+
+Mini experiment (same symptom, different cause): during `congest severe` the lock's RTT is high
+and router_lan rx ≈ 10,000; during `fault wan` the lock's RTT is high but router_lan rx stays
+≈ 2,000–4,000 — limiting the laptop would not help.
+
+### Step 17 — Reusable package and port map
+| Command | Expected |
+|---|---|
+| `sh cat /tmp/port_map.json` | 10 entries, e.g. `"laptop": "s1-eth10"` |
+| `sudo python3 -c "from topo.smart_home_topo import DEVICES; print(len(DEVICES))"` | 10 |
+| `--seed 43 --no-pcap` | seed 43, no capture |
+
+Mini experiment (preview of the only mitigation): `ovs-vsctl set interface <laptop port>
+ingress_policing_rate=2000 ingress_policing_burst=200` → laptop iperf ≈ 2 Mbit/s; set both to 0 →
+≈ 9 Mbit/s again.
+
+## Notes for the paper
+
+- Link values are an experimental choice; add a sensitivity check at bw = 20 and 50.
+- iperf version 2, not iperf3.
+- Average-load table (≈ 2.8 of 10 Mbit/s) shows normal traffic stays below capacity.
+- Seeds make runs repeatable in sequence, not bit-identical.
+- MQTT one-way delay relies on a shared clock; real devices would need NTP/PTP.
+- A ping reply > 1 s counts as lost; loss resolution is 33.3 % per row (3 pings).
+- Decoy faults (F_WAN, F_DEVLINK) are the cases where acting cannot help.

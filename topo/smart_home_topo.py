@@ -1,6 +1,17 @@
+#!/usr/bin/env python3
+"""
+smart_home_topo.py - the smart-home IoT network for
+"Trust-Aware Agentic AI for Smart-Home IoT Network Management".
+
+Interactive:       sudo python3 topo/smart_home_topo.py [--seed 42] [--no-pcap]
+From other folders: from topo.smart_home_topo import build_network, start_services, stop_services
+"""
+
+import argparse
+import json
 import os
-import time
 import random
+import time
 
 from mininet.net import Mininet
 from mininet.node import OVSSwitch, Node
@@ -20,7 +31,22 @@ from faults import random_fault, faults_running, stop_all_faults, reset_faults
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CAPTURE_DIR = os.path.join(PROJECT_ROOT, 'captures')
 
-SEED = 42    # change this to generate a different (but repeatable) run
+PORT_MAP_FILE = '/tmp/port_map.json'   # device -> s1 port, used later by the agent
+DEFAULT_SEED = 42                      # override with --seed N
+
+# (name, IP address/subnet) for every smart-home IoT device
+DEVICES = [
+    ('camera',     '10.0.0.1/24'),
+    ('doorbell',   '10.0.0.2/24'),
+    ('lock',       '10.0.0.3/24'),
+    ('thermostat', '10.0.0.4/24'),
+    ('speaker',    '10.0.0.5/24'),
+    ('light',      '10.0.0.6/24'),
+    ('plug',       '10.0.0.7/24'),
+    ('phone',      '10.0.0.8/24'),
+    ('tv',         '10.0.0.9/24'),
+    ('laptop',     '10.0.0.10/24'),
+]
 
 
 class LinuxRouter(Node):
@@ -82,32 +108,20 @@ class SmartHomeCLI(CLI):
         stop_all_faults()
 
 
-def run():
+def build_network():
+    """Create (but do not start) the network. Returns (net, hosts, cloud, router)."""
     net = Mininet(switch=OVSSwitch, link=TCLink, controller=None)
 
-    info('*** Adding the home switch\n')
+    info('*** Adding the home switch and the WAN switch\n')
     s1 = net.addSwitch('s1', failMode='standalone')
     s2 = net.addSwitch('s2', failMode='standalone')  # ISP / WAN side
 
     info('*** Adding the router\n')
     router = net.addHost('router', cls=LinuxRouter, ip=None)
 
-    devices = [
-        ('camera',     '10.0.0.1/24'),
-        ('doorbell',   '10.0.0.2/24'),
-        ('lock',       '10.0.0.3/24'),
-        ('thermostat', '10.0.0.4/24'),
-        ('speaker',    '10.0.0.5/24'),
-        ('light',      '10.0.0.6/24'),
-        ('plug',       '10.0.0.7/24'),
-        ('phone',      '10.0.0.8/24'),
-        ('tv',         '10.0.0.9/24'),
-        ('laptop',     '10.0.0.10/24'),
-    ]
-
     info('*** Adding the smart-home IoT devices\n')
     hosts = {}
-    for name, ip in devices:
+    for name, ip in DEVICES:
         hosts[name] = net.addHost(name, ip=ip, defaultRoute='via 10.0.0.254')
 
     info('*** Adding the cloud (internet) host\n')
@@ -129,9 +143,24 @@ def run():
                 params1={'ip': '172.16.0.1/24'})
     net.addLink(s2, cloud, bw=10, delay='10ms', loss=0)
 
-    info('*** Starting network\n')
-    net.start()
+    return net, hosts, cloud, router
 
+
+def write_port_map(net, hosts, path=PORT_MAP_FILE):
+    """Record which s1 port each IoT device is plugged into, e.g. {'laptop': 's1-eth10'}."""
+    s1 = net.get('s1')
+    ports = {}
+    for name, h in hosts.items():
+        dev_intf, switch_intf = h.connectionsTo(s1)[0]
+        ports[name] = switch_intf.name
+    with open(path, 'w') as f:
+        json.dump(ports, f, indent=2)
+    info(f'*** Port map written to {path}\n')
+    return ports
+
+
+def start_capture(router):
+    """Record every packet on both router sides into captures/<lan|wan>_<time>.pcap."""
     info('*** Starting packet capture\n')
     os.makedirs(CAPTURE_DIR, exist_ok=True)
     stamp = time.strftime('%Y%m%d_%H%M%S')
@@ -144,30 +173,64 @@ def run():
     info(f'*** LAN capture: {lan_file}\n')
     info(f'*** WAN capture: {wan_file}\n')
 
-    start_mqtt_traffic(hosts, cloud, SEED)
-    start_normal_traffic(hosts, cloud, SEED)
+
+def stop_capture(router):
+    """Stop both tcpdumps cleanly (like Ctrl+C) so the files are complete."""
+    info('*** Stopping packet capture\n')
+    router.cmd('pkill -INT -f "tcpdump -i r-eth"')
+    time.sleep(1)    # give tcpdump a moment to finish writing
+
+
+def start_services(net, hosts, cloud, router, seed, pcap=True):
+    """Everything that runs on top of the network, in the right order."""
+    if pcap:
+        start_capture(router)
+    start_mqtt_traffic(hosts, cloud, seed)
+    start_normal_traffic(hosts, cloud, seed)
     start_network_monitoring(hosts, router, cloud)
     reset_events_log()
     reset_faults()
-    rng = random.Random(SEED)              # repeatable event choices
+    write_port_map(net, hosts)
 
-    SmartHomeCLI(net, rng=rng)
 
+def stop_services(hosts, cloud, router, pcap=True):
+    """Reverse order: events, monitoring, traffic, then capture."""
     stop_all_floods()
     stop_all_faults()
     time.sleep(1)                          # let each event write its END line
     stop_network_monitoring()
     stop_normal_traffic(hosts, cloud)
     stop_mqtt_traffic(hosts, cloud)
+    if pcap:
+        stop_capture(router)
 
-    info('*** Stopping packet capture\n')
-    router.cmd('pkill -INT -f "tcpdump -i r-eth"')
-    time.sleep(1)    # give tcpdump a moment to finish writing
 
-    info('*** Stopping network\n')
-    net.stop()
+def run(seed=DEFAULT_SEED, pcap=True):
+    """Interactive mode: build, start, mininet> prompt, always clean up."""
+    net, hosts, cloud, router = build_network()
+
+    info('*** Starting network\n')
+    net.start()
+    start_services(net, hosts, cloud, router, seed, pcap)
+
+    try:
+        SmartHomeCLI(net, rng=random.Random(seed))
+    finally:
+        stop_services(hosts, cloud, router, pcap)
+        info('*** Stopping network\n')
+        net.stop()
+
+
+def parse_args():
+    ap = argparse.ArgumentParser(description='Smart-home IoT network (interactive)')
+    ap.add_argument('--seed', type=int, default=DEFAULT_SEED,
+                    help='seed for traffic and event choices (default 42)')
+    ap.add_argument('--no-pcap', action='store_true',
+                    help='do not record packet captures')
+    return ap.parse_args()
 
 
 if __name__ == '__main__':
+    args = parse_args()
     setLogLevel('info')
-    run()
+    run(seed=args.seed, pcap=not args.no_pcap)

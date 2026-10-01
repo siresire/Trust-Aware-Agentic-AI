@@ -13,6 +13,7 @@ from normal_traffic import start_normal_traffic, stop_normal_traffic
 from network_monitor import start_network_monitoring, stop_network_monitoring
 from congestion import (reset_events_log, random_congestion,
                         floods_running, stop_all_floods)
+from faults import random_fault, faults_running, stop_all_faults, reset_faults
 
 
 # Project root = the folder above topo/, so paths work no matter where you run from
@@ -41,14 +42,20 @@ class SmartHomeCLI(CLI):
         self.rng = rng                       # must be set before CLI starts the prompt
         super().__init__(net, **kwargs)
 
+    def _busy(self):
+        """True (and a message) if a flood or fault is still running: no overlapping events."""
+        if floods_running() or faults_running():
+            print('An event is still running: wait for it to end, or type stopflood / stopfault')
+            return True
+        return False
+
     def do_congest(self, line):
         """congest [severe|border] -- start a random labelled congestion event"""
         kind = line.strip() or None
         if kind not in (None, 'severe', 'border'):
             print('usage: congest [severe|border]')
             return
-        if floods_running():
-            print('An event is still running: wait for it to end, or type stopflood')
+        if self._busy():
             return
         ev = random_congestion(self.mn, self.rng, kind)
         print(f"event {ev['event_id']}: {ev['event_type']}, flooders {ev['flooders']}, "
@@ -57,6 +64,22 @@ class SmartHomeCLI(CLI):
     def do_stopflood(self, line):
         """stopflood -- end any running congestion event early"""
         stop_all_floods()
+
+    def do_fault(self, line):
+        """fault [wan|devlink] -- start a random labelled decoy fault"""
+        kind = line.strip() or None
+        if kind not in (None, 'wan', 'devlink'):
+            print('usage: fault [wan|devlink]')
+            return
+        if self._busy():
+            return
+        ev = random_fault(self.mn, self.rng, kind)
+        print(f"event {ev['event_id']}: {ev['event_type']} on {ev['target']}, "
+              f"delay {ev['delay_ms']} ms, loss {ev['loss_pct']} %, {ev['duration']} s")
+
+    def do_stopfault(self, line):
+        """stopfault -- end any running fault early (the cable is restored)"""
+        stop_all_faults()
 
 
 def run():
@@ -125,12 +148,14 @@ def run():
     start_normal_traffic(hosts, cloud, SEED)
     start_network_monitoring(hosts, router, cloud)
     reset_events_log()
+    reset_faults()
     rng = random.Random(SEED)              # repeatable event choices
 
     SmartHomeCLI(net, rng=rng)
 
     stop_all_floods()
-    time.sleep(1)                          # let each flood write its END line
+    stop_all_faults()
+    time.sleep(1)                          # let each event write its END line
     stop_network_monitoring()
     stop_normal_traffic(hosts, cloud)
     stop_mqtt_traffic(hosts, cloud)

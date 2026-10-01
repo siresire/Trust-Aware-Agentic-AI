@@ -1,7 +1,7 @@
 """
 network_monitor.py - measures every IoT device and the router while the network runs.
-Throughput from byte counters; RTT, jitter and loss from ping to the cloud.
-Used by smart_home_topo.py.
+Throughput from byte counters; RTT, jitter and loss from ping to the cloud;
+TCP internals (ss -ti) for the TCP devices. Used by smart_home_topo.py.
 """
 
 import os
@@ -11,6 +11,8 @@ from mininet.log import info
 
 METRICS_DIR = '/tmp/network_metrics'   # one log file per device / router side
 INTERVAL = 2                           # seconds between measurements
+TCP_DIR = '/tmp/tcp_metrics'             # one TCP log per TCP device
+TCP_HOSTS = ['phone', 'laptop', 'tv']    # devices whose traffic to the cloud is TCP
 
 _monitor_pids = []                     # (node, pid) of every loop we start, to stop exactly those
 
@@ -62,8 +64,36 @@ def start_device_monitor(node, label, iface, ping_dst=None, interval=INTERVAL,
     _monitor_pids.append((node, pid))
 
 
+def start_tcp_monitor(node, label, dst, interval=INTERVAL, tcp_dir=TCP_DIR):
+    """Every `interval` s, log TCP's internal state for this device's connection to the cloud."""
+    log = f'{tcp_dir}/{label}.log'
+    with open(log, 'w') as f:
+        f.write('timestamp,device,conns,cwnd,ssthresh,srtt_ms,retrans_total,unacked\n')
+
+    flt = f'state established dst {dst} dport = :5001'
+    cmd = (
+        f'( while true; do '
+        f'CONNS=$(ss -tn {flt} | tail -n +2 | wc -l); '
+        f'STATS=$(ss -tin {flt} | grep -m1 cwnd); '
+        f'CWND=$(echo "$STATS" | grep -oP "\\bcwnd:\\K[0-9]+"); '
+        f'SSTHRESH=$(echo "$STATS" | grep -oP "\\bssthresh:\\K[0-9]+"); '
+        f'SRTT=$(echo "$STATS" | grep -oP "\\brtt:\\K[0-9.]+"); '
+        f'RETRANS=$(echo "$STATS" | grep -oP "\\bretrans:[0-9]+/\\K[0-9]+"); '
+        f'UNACKED=$(echo "$STATS" | grep -oP "\\bunacked:\\K[0-9]+"); '
+        f'if [ "$CONNS" -gt 0 ]; then '
+        f'RETRANS=${{RETRANS:-0}}; UNACKED=${{UNACKED:-0}}; fi; '
+        f'echo "$(date +%s.%N),{label},$CONNS,${{CWND:-NA}},${{SSTHRESH:-NA}},'
+        f'${{SRTT:-NA}},${{RETRANS:-NA}},${{UNACKED:-NA}}" >> {log}; '
+        f'sleep {interval}; '
+        f'done ) &'
+    )
+    node.cmd(cmd)
+    pid = node.cmd('echo $!').strip()
+    _monitor_pids.append((node, pid))
+
+
 def start_network_monitoring(hosts, router, cloud, interval=INTERVAL):
-    """One loop per IoT device (throughput + ping to the cloud), plus both router sides."""
+    """One loop per IoT device (throughput + ping), both router sides, and TCP internals."""
     info(f'*** Starting network monitoring (every {interval}s)\n')
     shutil.rmtree(METRICS_DIR, ignore_errors=True)    # remove last run's logs
     os.makedirs(METRICS_DIR)
@@ -73,6 +103,11 @@ def start_network_monitoring(hosts, router, cloud, interval=INTERVAL):
         start_device_monitor(h, name, f'{name}-eth0', ping_dst=dst, interval=interval)
     start_device_monitor(router, 'router_lan', 'r-eth0', interval=interval)
     start_device_monitor(router, 'router_wan', 'r-eth1', interval=interval)
+
+    shutil.rmtree(TCP_DIR, ignore_errors=True)        # remove last run's TCP logs
+    os.makedirs(TCP_DIR)
+    for name in TCP_HOSTS:
+        start_tcp_monitor(hosts[name], name, dst, interval=interval)
 
 
 def stop_network_monitoring():

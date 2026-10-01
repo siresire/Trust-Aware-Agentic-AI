@@ -95,7 +95,7 @@ def run():
 
     start_mqtt_traffic(hosts, cloud, SEED)
     start_normal_traffic(hosts, cloud, SEED)
-    start_network_monitoring(hosts, router)
+    start_network_monitoring(hosts, router, cloud)
 
     CLI(net)
 

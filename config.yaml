@@ -1,0 +1,65 @@
+# config.yaml - all numbers of the project in one place.
+# The testbed values below describe the code frozen as git tag testbed-v1.
+
+project: Trust-Aware Agentic AI for Smart-Home IoT Network Management
+
+testbed:
+  tag: testbed-v1
+  link: {bw_mbit: 10, lan_delay_ms: 5, wan_delay_ms: 10, loss_pct: 0}
+  interval_s: 2
+  ping: {count: 3, spacing_s: 0.2, timeout_s: 1}      # no reply within 1 s counts as lost
+
+devices:
+  protected: [camera, doorbell, lock, thermostat, speaker, light, plug]
+  limitable: [phone, tv, laptop]
+
+session:
+  duration_s: 1800
+  max_events: 12
+  quiet_start_s: 120
+  gap_s: [45, 120]
+  event_duration_s: [15, 60]
+  min_quiet_after_end_s: 30
+
+events:
+  weights: {C_SEVERE: 0.35, C_BORDER: 0.25, F_WAN: 0.20, F_DEVLINK: 0.20}
+  C_SEVERE:  {flooders: [2, 3], rate_mbps: [8, 20], should_act: true}
+  C_BORDER:  {flooders: 1,      rate_mbps: [5, 9],  should_act: true}
+  F_WAN:     {delay_ms: [60, 150], loss_pct: [3, 10], should_act: false}
+  F_DEVLINK: {loss_pct: [10, 30], should_act: false,
+              devices: [camera, doorbell, lock, thermostat, speaker]}
+
+baseline:
+  sessions: [101, 102, 103]
+  warmup_s: 30
+  uplink_kbps: {p50: 2412, p95: 5515, p99: 6710, max: 7830}
+
+thresholds:
+  rtt_p99_ms:
+    camera: 103.0
+    doorbell: 102.7
+    lock: 102.0
+    thermostat: 103.4
+    speaker: 102.2
+    light: 102.0
+    plug: 105.3
+    phone: 112.0
+    tv: 130.0
+    laptop: 133.8
+  normal_loss_rows_pct:
+    camera: 0.08
+    doorbell: 0.04
+    lock: 0.00
+    thermostat: 0.16
+    speaker: 0.00
+    light: 0.00
+    plug: 0.00
+    phone: 0.20
+    tv: 0.65
+    laptop: 0.44
+  mqtt_delay_p99_ms:
+    thermostat: 339.4
+    lock: 409.8
+    doorbell: 362.1
+    light: 222.1
+    plug: 218.6

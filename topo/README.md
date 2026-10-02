@@ -129,6 +129,9 @@ camera + speaker ≈ 0.07, MQTT ≈ 0) — normal traffic stays well below capac
 | Application | MQTT delivery delay, missing, duplicates | `/tmp/mqtt_received.log` (+ `mqtt_delay.py`) |
 | Raw packets | everything on both router sides | `captures/*.pcap` |
 
+RTT and jitter are read as the numbers after `=` in ping's summary line, so the `, pipe N`
+suffix ping adds under congestion cannot break a row.
+
 Ping runs in the background *during* each 2 s window, and throughput divides by the measured
 window length. A ping reply slower than 1 s counts as lost.
 
@@ -140,6 +143,9 @@ window length. A ping reply slower than 1 s counts as lost.
 | C_BORDER | 1 of laptop/phone/tv at 6–12 Mbit/s | sometimes | 7–10 Mbit/s | often | yes |
 | F_WAN | WAN cable delay 30–80 ms, loss 1–5 % | everyone | **not** full | no | no |
 | F_DEVLINK | one IoT device's cable loss 5–20 % | that device only | normal | no | no |
+| C_BORDER | 1 of laptop/phone/tv at 5–9 Mbit/s | sometimes | 7–10 Mbit/s | often | yes |
+| F_WAN | WAN cable delay 60–150 ms, loss 3–10 % | everyone | **not** full | no | no |
+| F_DEVLINK | one IoT device's cable loss 10–30 % | that device only | normal | no | no |
 
 Durations 15–60 s. Only laptop, phone and tv may flood; protected devices (camera, lock,
 doorbell, thermostat, speaker, light, plug) never do. Every event writes a `start` and an

@@ -24,7 +24,7 @@ def draw_params(event_type, rng):
                     rate_mbps=rng.randint(8, 20))
     if event_type == 'C_BORDER':
         return dict(flooders=[rng.choice(ALLOWED_FLOODERS)],
-                    rate_mbps=rng.randint(6, 12))
+                    rate_mbps=rng.randint(5, 9))
     if event_type == 'F_WAN':                  # calibrated in the pilot: visible but link not full
         return dict(delay_ms=rng.randint(60, 150), loss_pct=rng.randint(3, 10))
     if event_type == 'F_DEVLINK':              # calibrated in the pilot: clear loss on one device

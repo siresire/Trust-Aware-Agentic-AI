@@ -68,7 +68,7 @@ def random_congestion(net, rng, kind=None):
         event_type = 'C_SEVERE'
     else:                                          # 1 flooder, sometimes enough to overload
         flooders = [rng.choice(ALLOWED_FLOODERS)]
-        rate = rng.randint(6, 12)
+        rate = rng.randint(5, 9)
         event_type = 'C_BORDER'
 
     duration = rng.randint(15, 60)

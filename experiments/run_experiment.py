@@ -27,6 +27,7 @@ from experiments.scenarios import make_schedule, should_act
 
 RAW_DIR = os.path.join(PROJECT_ROOT, 'data', 'raw')
 LINK = dict(bw_mbit=10, lan_delay_ms=5, wan_delay_ms=10, loss_pct=0)   # as in smart_home_topo.py
+MIN_QUIET_S = 30          # at least this long after the last END before the next event starts
 
 
 def git_info():
@@ -48,6 +49,16 @@ def wait_until(t0, offset):
         time.sleep(delay)
 
 
+def last_event_end():
+    """Time of the most recent END line in the events log (None if there is none yet)."""
+    try:
+        with open(EVENT_LOG) as f:
+            ends = [float(line.split(',')[0]) for line in f if line.rstrip().endswith(',end')]
+    except (FileNotFoundError, ValueError):
+        return None
+    return max(ends) if ends else None
+
+
 def start_event(net, ev):
     """Start one scheduled event with ITS OWN parameters. Returns the events.log event_id."""
     p = ev['params']
@@ -59,13 +70,25 @@ def start_event(net, ev):
     return device_link_fault(net, p['device'], p['loss_pct'], ev['duration'])
 
 
-def play_schedule(net, schedule, t0, warnings):
-    """Start each event at its planned time (later if the previous one is still running)."""
+def play_schedule(net, schedule, t0, duration, warnings):
+    """Start each event at its planned time, but only after the previous one has ended
+    and the network has had MIN_QUIET_S of quiet time to recover."""
     for ev in schedule:
         wait_until(t0, ev['t_start'])
         while floods_running() or faults_running():          # previous event still draining
             time.sleep(1)
+        last_end = last_event_end()
+        if last_end is not None:
+            quiet_left = MIN_QUIET_S - (time.time() - last_end)
+            if quiet_left > 0:
+                time.sleep(quiet_left)                          # let the devices recover first
+
         actual = time.time() - t0
+        if actual + ev['duration'] > duration:
+            warnings.append(f"event {ev['id']} skipped: not enough session time left")
+            info(f"*** [{actual:6.0f} s] event {ev['id']} skipped (not enough time left)\n")
+            continue
+
         ev['event_id'] = start_event(net, ev)
         ev['actual_start_s'] = round(actual, 1)
         ev['late_s'] = round(actual - ev['t_start'], 1)
@@ -115,10 +138,11 @@ def run_session(session, seed, duration, n_events, pcap, out_root):
     net, hosts, cloud, router = build_network()
     net.start()
     complete = False
+    t0 = time.time()                                 # defined before anything can fail
     try:
         start_services(net, hosts, cloud, router, seed, pcap)
-        t0 = time.time()
-        play_schedule(net, schedule, t0, warnings)
+        t0 = time.time()                             # session clock starts once services run
+        play_schedule(net, schedule, t0, duration, warnings)
         wait_until(t0, duration)                     # recovery time after the last event
         complete = True
     except KeyboardInterrupt:
@@ -133,9 +157,11 @@ def run_session(session, seed, duration, n_events, pcap, out_root):
     meta = dict(session=session, seed=seed, complete=complete,
                 start=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(t0)),
                 duration_planned_s=duration, duration_actual_s=round(t_end - t0, 1),
-                interval_s=INTERVAL, link=LINK, pcap=pcap,
+                interval_s=INTERVAL, link=LINK, pcap=pcap, min_quiet_s=MIN_QUIET_S,
                 git_commit=commit, git_dirty=dirty,
-                n_events=len(schedule), schedule=schedule, warnings=warnings)
+                n_events=len(schedule),
+                n_events_played=sum('event_id' in ev for ev in schedule),
+                schedule=schedule, warnings=warnings)
     os.makedirs(out_dir)
     save_session(out_dir, meta, schedule)
     info(f'*** Saved {out_dir}  (complete={complete}, {len(warnings)} warning(s))\n')

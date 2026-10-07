@@ -1,5 +1,4 @@
-"""Step 25 - label every row.
-
+"""
 Adds to each merged row:
   rtt_thr_ms    the device's own threshold (from config.yaml)
   bad           this single reading is bad (slow, or a ping was lost)

@@ -1,5 +1,4 @@
-"""Step 24 - merge the logs of one session into one table.
-
+"""
 One output row = one device in one 2-second window, with everything
 known about that moment: its own measurements, the shared link, its
 TCP state, its sensor messages and the event that was running.

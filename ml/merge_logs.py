@@ -54,21 +54,14 @@ def read_log(path, n_values):
             rows.append((ts, values))
     rows.sort(key=lambda r: r[0])
     return rows
-
+    
 
 def nearest(rows, times, ts, n_values):
-    """Values of the row closest in time to ts, or blanks if none is close enough."""
-    if not rows:
+    """Values of the newest row at or before ts, or blanks if it is too old."""
+    i = bisect.bisect_right(times, ts) - 1
+    if i < 0 or ts - rows[i][0] > MAX_GAP_S:
         return [''] * n_values
-    i = bisect.bisect_left(times, ts)
-    best = None
-    for j in (i - 1, i):
-        if 0 <= j < len(rows):
-            if best is None or abs(rows[j][0] - ts) < abs(rows[best][0] - ts):
-                best = j
-    if abs(rows[best][0] - ts) > MAX_GAP_S:
-        return [''] * n_values
-    return rows[best][1]
+    return rows[i][1]
 
 
 def read_mqtt(path):

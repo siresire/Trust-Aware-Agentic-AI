@@ -1,0 +1,24 @@
+{
+  "protected": {
+    "lock": "high",
+    "camera": "high",
+    "doorbell": "high",
+    "thermostat": "medium",
+    "speaker": "low",
+    "light": "low",
+    "plug": "low"
+  },
+  "may_slow": [
+    "phone",
+    "tv",
+    "laptop"
+  ],
+  "min_rate_mbit": 1,
+  "max_slow_s": 60,
+  "recheck_every_s": 10,
+  "tell_homeowner": {
+    "jam": false,
+    "internet_fault": true,
+    "device_fault": true
+  }
+}

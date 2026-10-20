@@ -1,0 +1,3 @@
+Agent 2 running: line full at 0.8, waiting rules {'jam': {'hits': 1, 'of_last': 1}, 'internet fault': {'hits': 2, 'of_last': 2}, 'device fault': {'hits': 3, 'of_last': 5}}
+00:42:29  prob 0.05  alarms 0  link 0.21  now ok             steady ok              A1: none         A2: OK      nothing to do  
+00:42:32  prob 0.58  alarms 1  link 0.21  now device fault   steady ok              A1: slow tv      A2: REFUSE  line 0.21 is not full (not steady yet)  

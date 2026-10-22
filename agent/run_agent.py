@@ -18,6 +18,8 @@ Needs root (ovs-vsctl). Run from the project root, with the network running:
 import argparse
 import json
 import os
+import signal
+import sys
 import time
 from collections import deque
 
@@ -44,6 +46,7 @@ class Actor:
         self.last_act = 0.0             # time of the last slow-down
         self.link_at_act = None         # how full the line was when we acted
         self.check_due = False          # a check after acting is still to do
+        self.last_warned = []           # devices warned in the last device-fault snapshot
 
     def note(self, what, **info):
         """Write one action line to the log and the screen."""
@@ -106,6 +109,36 @@ def decide(mode, proposal, verdict, kind):
     return 'OK', kind                                # none: never act
 
 
+def tick(thresholds, actor, history, log, mode):
+    """One 2-second step: look, propose, verify, log, act."""
+    now = build_now(thresholds)
+    if now is None:
+        print('no live logs yet - is the network running?', flush=True)
+        return
+    snap = look(now)
+    proposal = propose(snap)
+    history.append(diagnose(snap))
+    if history[-1] == 'device fault':
+        actor.last_warned = snap['warned']
+    kind = steady(history)
+    verdict, why = verify(proposal, kind, snap)
+    tell = report(kind, actor.last_warned)
+    p = f"{proposal['action']} {proposal['device'] or ''}".strip()
+    print(f"{time.strftime('%H:%M:%S')}  prob {snap['max_prob']:4.2f}  "
+          f"alarms {snap['n_alarm']}  link {snap['link']:4.2f}  "
+          f"steady {kind:14s}  A1: {p:11s}  A2: {verdict:7s}  "
+          f"slowed: {','.join(actor.slowed) or '-':18s} {tell}", flush=True)
+    log.write(json.dumps({
+        't': round(time.time(), 2), 'event': 'TICK',
+        'prob': round(float(snap['max_prob']), 3), 'alarms': snap['n_alarm'],
+        'warned': snap['warned'], 'link': round(float(snap['link']), 3),
+        'top': snap['top_sender'], 'now': history[-1], 'steady': kind,
+        'a1': p, 'a2': verdict, 'why': why, 'tell': tell,
+        'slowed': list(actor.slowed)}) + '\n')
+    log.flush()                                         # on disk now, whatever happens later
+    actor.step(*decide(mode, proposal, verdict, kind), snap)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--mode', choices=MODES, default='trust')
@@ -123,42 +156,27 @@ def main():
         undo(dev)
     actor = Actor(log)
     history = deque(maxlen=5)
-    last_warned = []
     print(f'MODE {args.mode}: line full at {FULL}, slow to {RATE} Mbit/s, '
           f'check after {RECHECK} s, undo after {MAX_SLOW} s', flush=True)
+    signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))   # the runner stops us: finish cleanly
     try:
         while True:
             t = time.time()
-            now = build_now(thresholds)
-            if now is None:
-                print('no live logs yet - is the network running?', flush=True)
-            else:
-                snap = look(now)
-                proposal = propose(snap)
-                history.append(diagnose(snap))
-                if history[-1] == 'device fault':
-                    last_warned = snap['warned']
-                kind = steady(history)
-                verdict, why = verify(proposal, kind, snap)
-                tell = report(kind, last_warned)
-                p = f"{proposal['action']} {proposal['device'] or ''}".strip()
-                print(f"{time.strftime('%H:%M:%S')}  prob {snap['max_prob']:4.2f}  "
-                      f"alarms {snap['n_alarm']}  link {snap['link']:4.2f}  "
-                      f"steady {kind:14s}  A1: {p:11s}  A2: {verdict:7s}  "
-                      f"slowed: {','.join(actor.slowed) or '-':18s} {tell}", flush=True)
-                log.write(json.dumps({
-                    't': round(time.time(), 2), 'event': 'TICK',
-                    'prob': round(float(snap['max_prob']), 3), 'alarms': snap['n_alarm'],
-                    'warned': snap['warned'], 'link': round(float(snap['link']), 3),
-                    'top': snap['top_sender'], 'now': history[-1], 'steady': kind,
-                    'a1': p, 'a2': verdict, 'why': why, 'tell': tell,
-                    'slowed': list(actor.slowed)}) + '\n')
-                actor.step(*decide(args.mode, proposal, verdict, kind), snap)
+            try:
+                tick(thresholds, actor, history, log, args.mode)
+            except Exception as e:                      # one bad snapshot must not stop the agent
+                log.write(json.dumps({'t': round(time.time(), 2), 'event': 'ERROR',
+                                      'error': repr(e)}) + '\n')
+                log.flush()
+                print(f'ERROR (snapshot skipped): {e!r}', flush=True)
             time.sleep(max(0, INTERVAL - (time.time() - t)))
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         print('\nstopping', flush=True)
     finally:
-        actor.undo_all('agent stopped')
+        try:
+            actor.undo_all('agent stopped')
+        except Exception:
+            pass                                    # the network may already be gone
         log.close()
 
 

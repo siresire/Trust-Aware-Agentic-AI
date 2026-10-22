@@ -3,13 +3,15 @@ results.py - the experiment's tables and figures.
 Reads the 9 runs (3 seeds x 3 modes) and the answer sheet of each session, and writes
 everything the paper needs into results/.
 
-    data/experiment/agent_<session>_<mode>.jsonl   what the agent saw and did every 2 s
+    data/experiment2/agent_<session>_<mode>.jsonl  what the agent saw and did every 2 s
     data/raw/session_<session>/events.csv          when each event started and ended (the truth)
     data/raw/session_<session>/network_metrics/    how every device actually felt
 
 Run from the project root (no sudo):
-    .venv/bin/python -m analysis.results
+    .venv/bin/python -m analysis.results                          # data/experiment2 (the main run)
+    .venv/bin/python -m analysis.results --exp data/experiment     # the first run
 """
+import argparse
 import csv
 import glob
 import json
@@ -24,9 +26,9 @@ from matplotlib.patches import Patch
 
 from ml import label
 
-EXP_DIR = 'data/experiment'
+EXP_DIR = 'data/experiment2'               # the run with logs written as they happen
 RAW_DIR = 'data/raw'
-OUT_DIR = 'results'
+OUT_DIR = 'results'                        # the tables and figures go here
 THRESHOLDS = 'config_ubuntu.yaml'           # the same normal levels the live agent used
 
 MODES = ['none', 'predict', 'trust']
@@ -99,6 +101,22 @@ def overlap(a0, a1, b0, b1):
     return max(0.0, min(a1, b1) - max(a0, b0))
 
 
+def calm_seconds(t0, t1, busy):
+    """Seconds between t0 and t1 not covered by any busy span (each second counted once)."""
+    spans = sorted((max(a, t0), min(b, t1)) for a, b in busy if min(b, t1) > max(a, t0))
+    covered, cur_a, cur_b = 0.0, None, None
+    for a, b in spans:
+        if cur_b is None or a > cur_b:
+            if cur_b is not None:
+                covered += cur_b - cur_a
+            cur_a, cur_b = a, b
+        else:
+            cur_b = max(cur_b, b)
+    if cur_b is not None:
+        covered += cur_b - cur_a
+    return (t1 - t0) - covered
+
+
 def read_readings(session_dir, thr):
     """Every protected-device reading: (time, rtt or None, bad)."""
     out = []
@@ -164,19 +182,20 @@ def score_run(path, thr):
             'protected_rtt_median': round(statistics.median(rtts), 1) if rtts else '',
         })
 
-    # calm time: no event running, and not in the 30 s after one
+    # calm time: no event running, and not in the 30 s after one (measured by the clock)
     busy = [(e['start'], e['end'] + RECOVERY_S) for e in read_events(session_dir)]
     def calm(t):
         return t0 <= t <= t1 and not any(a <= t <= b for a, b in busy)
-    calm_ticks = [r for r in ticks if calm(r['t'])]
     new_msgs = sum(1 for i, r in enumerate(ticks)
                    if r['tell'] and calm(r['t']) and (i == 0 or ticks[i - 1]['tell'] != r['tell']))
     run = {
         'session': session, 'seed': seed, 'mode': mode,
-        'calm_hours': len(calm_ticks) * 2 / 3600,
+        'calm_hours': calm_seconds(t0, t1, busy) / 3600,
         'calm_slowdowns': sum(1 for a in slows if calm(a['t'])),
         'calm_messages': new_msgs,
         'all_slowdowns': len(slows),
+        'agent_minutes': round((t1 - t0) / 60, 1),
+        'errors': sum(1 for a in actions if a['event'] == 'ERROR'),
     }
     return run, rows, ticks, spans, events
 
@@ -323,6 +342,10 @@ def write_csv(path, rows):
 
 
 def main():
+    global EXP_DIR
+    p = argparse.ArgumentParser()
+    p.add_argument('--exp', default=EXP_DIR, help='folder with the agent logs')
+    EXP_DIR = p.parse_args().exp
     os.makedirs(OUT_DIR, exist_ok=True)
     thr = label.read_thresholds(THRESHOLDS)
     runs, rows, per_seed = [], [], {}
@@ -332,12 +355,13 @@ def main():
         rows += run_rows
         per_seed.setdefault(run['seed'], {})[run['mode']] = dict(ticks=ticks, spans=spans, events=events)
         print(f"read session {run['session']} (seed {run['seed']}, {run['mode']}): "
-              f"{len(run_rows)} events, {run['all_slowdowns']} slow-downs")
+              f"agent {run['agent_minutes']} min, {len(run_rows)} events, "
+              f"{run['all_slowdowns']} slow-downs, {run['errors']} errors")
 
     write_csv(os.path.join(OUT_DIR, 'events_scored.csv'), rows)
     write_csv(os.path.join(OUT_DIR, 'runs_scored.csv'), runs)
 
-    text = ['# Results', '',
+    text = ['# Results', '', f'Runs from {EXP_DIR}', '',
             '## Table 1: what each policy did (all three sessions together)', '', table_main(runs, rows), '',
             '## Table 2: protected devices during events (share of readings that were bad)', '',
             table_protected(rows), '',

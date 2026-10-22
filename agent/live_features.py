@@ -17,9 +17,9 @@ import pandas as pd
 
 from ml import merge_logs, label, features
 
-LIVE_DIR = '/tmp/live_session'          # looks like a recorded session folder
-MERGED = '/tmp/live_merged.csv'         # what merge_logs makes
-LABELLED = '/tmp/live_labelled.csv'     # what label adds ('bad' and the threshold)
+LIVE_DIR = 'data/live/session'          # looks like a recorded session folder
+MERGED = 'data/live/merged.csv'         # what merge_logs makes
+LABELLED = 'data/live/labelled.csv'     # what label adds ('bad' and the threshold)
 INTERVAL = 2                            # seconds, same as the monitor
 
 

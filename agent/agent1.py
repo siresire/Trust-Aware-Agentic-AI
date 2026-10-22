@@ -41,6 +41,7 @@ def look(now):
         'warned': list(prot.index[prot['prob'] >= WARN]),
         'link': now['uplink_util'].max(),
         'top_sender': lim['tx_kbps'].idxmax(),
+        'senders': list(lim['tx_kbps'].sort_values(ascending=False).index),   # NEW: biggest sender first
     }
 
 

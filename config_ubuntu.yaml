@@ -1,0 +1,69 @@
+# config_ubuntu.yaml - the same as config.yaml, but with the normal levels of the
+# Ubuntu host (sire-ML), measured from session 202: 30 min, no events, MQTT working.
+# Used ONLY by the live agent (agent/run_agent.py).
+# config.yaml keeps the Kali values that the training data and the model were built with.
+
+project: Trust-Aware Agentic AI for Smart-Home IoT Network Management
+
+testbed:
+  tag: testbed-v1
+  link: {bw_mbit: 10, lan_delay_ms: 5, wan_delay_ms: 10, loss_pct: 0}
+  interval_s: 2
+  ping: {count: 3, spacing_s: 0.2, timeout_s: 1}      # no reply within 1 s counts as lost
+
+devices:
+  protected: [camera, doorbell, lock, thermostat, speaker, light, plug]
+  limitable: [phone, tv, laptop]
+
+session:
+  duration_s: 1800
+  max_events: 12
+  quiet_start_s: 120
+  gap_s: [45, 120]
+  event_duration_s: [15, 60]
+  min_quiet_after_end_s: 30
+
+events:
+  weights: {C_SEVERE: 0.35, C_BORDER: 0.25, F_WAN: 0.20, F_DEVLINK: 0.20}
+  C_SEVERE:  {flooders: [2, 3], rate_mbps: [8, 20], should_act: true}
+  C_BORDER:  {flooders: 1,      rate_mbps: [5, 9],  should_act: true}
+  F_WAN:     {delay_ms: [60, 150], loss_pct: [3, 10], should_act: false}
+  F_DEVLINK: {loss_pct: [10, 30], should_act: false,
+              devices: [camera, doorbell, lock, thermostat, speaker]}
+
+# UBUNTU: measured from session 202 on sire-ML (Kali used sessions 101-103)
+baseline:
+  sessions: [202]
+  warmup_s: 30
+  uplink_kbps: {p50: 2518, p95: 5659, p99: 7227, max: 9031}
+
+# UBUNTU: printed by "python3 -m experiments.baseline" from session 202
+thresholds:
+  rtt_p99_ms:
+    camera: 119.5
+    doorbell: 128.7
+    lock: 113.7
+    thermostat: 129.2
+    speaker: 118.6
+    light: 124.5
+    plug: 117.1
+    phone: 134.3
+    tv: 165.6
+    laptop: 137.8
+  normal_loss_rows_pct:
+    camera: 0.47
+    doorbell: 0.59
+    lock: 0.47
+    thermostat: 0.47
+    speaker: 0.36
+    light: 0.12
+    plug: 0.24
+    phone: 0.59
+    tv: 2.49
+    laptop: 1.54
+  mqtt_delay_p99_ms:
+    thermostat: 332.2
+    lock: 302.1
+    doorbell: 336.9
+    light: 321.1
+    plug: 197.9

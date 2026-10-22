@@ -1,0 +1,97 @@
+session,seed,mode,event,type,devices,duration_s,slowdowns,first_slow_s,slowed_flooder,slowed_seconds,named_as,name_right,protected_bad_pct,protected_rtt_median
+301,701,none,1,C_SEVERE,laptop|tv,65.2,0,,0,0,jam,1,97.2,494.1
+301,701,none,2,C_SEVERE,laptop|tv,74.3,0,,0,0,jam,1,99.2,738.6
+301,701,none,3,F_DEVLINK,lock,50.0,0,,0,0,device fault,1,21.0,75.3
+301,701,none,4,F_DEVLINK,lock,38.0,0,,0,0,device fault,1,7.8,72.1
+301,701,none,5,C_SEVERE,phone|tv,82.7,0,,0,0,jam,1,97.5,554.5
+301,701,none,6,C_BORDER,phone,30.1,0,,0,0,jam,1,90.1,557.3
+301,701,none,7,F_WAN,wan,16.0,0,,0,0,internet fault,1,86.0,138.0
+302,702,none,1,C_SEVERE,laptop|phone|tv,41.5,0,,0,0,jam,1,94.7,356.4
+302,702,none,2,C_SEVERE,laptop|tv,69.9,0,,0,0,jam,1,96.9,454.9
+302,702,none,3,C_BORDER,phone,35.1,0,,0,0,jam,1,93.6,475.5
+302,702,none,4,C_BORDER,tv,15.5,0,,0,0,jam,1,64.0,129.5
+302,702,none,5,C_BORDER,phone,28.8,0,,0,0,jam,1,68.1,249.7
+302,702,none,6,C_BORDER,tv,44.1,0,,0,0,jam,1,65.7,545.3
+302,702,none,7,C_BORDER,phone,54.5,0,,0,0,jam,1,64.3,194.4
+302,702,none,8,C_BORDER,phone,76.3,0,,0,0,jam,1,96.7,453.8
+302,702,none,9,F_DEVLINK,camera,35.1,0,,0,0,device fault,1,10.6,68.1
+303,703,none,1,C_SEVERE,laptop|phone,37.5,0,,0,0,jam,1,94.1,409.2
+303,703,none,2,C_BORDER,phone,22.0,0,,0,0,jam,1,52.1,125.6
+303,703,none,3,C_BORDER,phone,59.3,0,,0,0,jam,1,96.3,495.8
+303,703,none,4,C_SEVERE,laptop|tv,47.6,0,,0,0,jam,1,95.3,360.0
+303,703,none,5,F_WAN,wan,20.0,0,,0,0,internet fault,1,94.0,154.8
+303,703,none,6,C_SEVERE,phone|tv,72.9,0,,0,0,jam,1,97.0,464.2
+303,703,none,7,C_BORDER,phone,79.1,0,,0,0,jam,1,95.6,663.0
+303,703,none,8,C_SEVERE,laptop|phone|tv,64.6,0,,0,0,jam,1,96.6,478.9
+311,701,predict,1,C_SEVERE,laptop|tv,41.4,3,8.2,2,110.9,device fault,0,0.0,71.9
+311,701,predict,2,C_SEVERE,laptop|tv,51.6,1,24.5,1,149.6,jam,1,5.5,70.5
+311,701,predict,3,F_DEVLINK,lock,50.0,2,10.6,0,146.0,device fault,1,10.0,71.2
+311,701,predict,4,F_DEVLINK,lock,38.1,2,4.1,0,101.8,jam,0,11.5,70.9
+311,701,predict,5,C_SEVERE,phone|tv,61.1,3,19.7,2,149.9,device fault,0,11.7,71.3
+311,701,predict,6,C_BORDER,phone,34.3,3,6.1,1,91.2,internet fault,0,22.9,71.7
+311,701,predict,7,F_WAN,wan,16.0,1,5.7,0,48.1,internet fault,1,67.9,126.2
+311,701,predict,8,C_BORDER,tv,31.1,2,6.6,1,92.7,device fault,0,4.9,72.7
+311,701,predict,9,C_SEVERE,laptop|phone,22.9,2,4.0,1,64.8,jam,1,35.6,76.5
+311,701,predict,10,C_SEVERE,phone|tv,41.9,2,7.6,2,125.7,device fault,0,8.2,70.5
+311,701,predict,11,F_DEVLINK,doorbell,32.0,2,13.7,0,58.4,jam,0,23.8,72.6
+311,701,predict,12,F_WAN,wan,26.0,1,22.2,0,78.1,internet fault,1,95.2,184.2
+312,702,predict,1,C_SEVERE,laptop|phone|tv,29.0,2,4.1,2,78.7,jam,1,26.6,78.3
+312,702,predict,2,C_SEVERE,laptop|tv,44.1,2,11.3,1,117.3,internet fault,0,1.4,70.2
+312,702,predict,3,C_BORDER,phone,27.9,2,10.6,0,74.1,jam,1,22.0,73.3
+312,702,predict,4,C_BORDER,tv,17.3,1,17.7,0,28.9,ok,0,1.7,72.4
+312,702,predict,5,C_BORDER,phone,31.2,3,3.6,1,83.9,jam,1,18.2,77.1
+312,702,predict,6,C_BORDER,tv,45.0,2,11.0,0,108.4,internet fault,0,6.1,68.8
+312,702,predict,7,C_BORDER,phone,54.5,2,10.2,1,150.9,device fault,0,4.5,69.5
+312,702,predict,8,C_BORDER,phone,57.2,3,5.2,1,165.5,device fault,0,12.0,69.5
+312,702,predict,9,F_DEVLINK,camera,35.0,3,7.8,0,99.1,device fault,1,9.7,67.6
+312,702,predict,10,F_DEVLINK,thermostat,49.0,3,1.4,0,145.6,device fault,1,18.2,68.9
+312,702,predict,11,C_SEVERE,laptop|phone|tv,61.8,4,1.4,4,178.0,jam,1,11.7,71.7
+312,702,predict,12,F_DEVLINK,doorbell,30.0,0,,0,90.1,device fault,1,7.1,70.6
+313,703,predict,1,C_SEVERE,laptop|phone,37.1,3,5.6,2,61.1,jam,1,65.3,264.5
+313,703,predict,2,C_BORDER,phone,25.2,1,15.6,0,60.2,ok,0,7.2,72.5
+313,703,predict,3,C_BORDER,phone,56.3,2,15.5,1,146.3,device fault,0,10.4,72.1
+313,703,predict,4,C_SEVERE,laptop|tv,26.1,2,12.7,2,71.0,device fault,0,1.2,70.9
+313,703,predict,5,F_WAN,wan,20.0,2,0.0,0,60.0,internet fault,1,92.1,160.5
+313,703,predict,6,C_SEVERE,phone|tv,51.5,3,2.3,2,152.1,internet fault,0,12.0,71.0
+313,703,predict,7,C_BORDER,phone,69.1,3,13.3,1,193.4,jam,1,12.5,71.7
+313,703,predict,8,C_SEVERE,laptop|phone|tv,42.9,2,9.5,2,122.9,internet fault,0,23.4,74.0
+313,703,predict,9,F_DEVLINK,lock,46.0,3,10.9,0,127.7,internet fault,0,11.0,70.4
+313,703,predict,10,F_DEVLINK,camera,41.0,3,3.4,0,102.4,device fault,1,14.4,69.5
+313,703,predict,11,C_BORDER,phone,27.9,2,17.4,1,77.5,internet fault,0,15.9,70.8
+313,703,predict,12,C_BORDER,phone,45.6,3,8.9,1,128.1,device fault,0,7.5,71.0
+321,701,trust,1,C_SEVERE,laptop|tv,64.4,2,5.6,2,106.1,jam,1,34.0,74.2
+321,701,trust,2,C_SEVERE,laptop|tv,54.7,2,2.9,2,100.5,jam,1,7.8,69.2
+321,701,trust,3,F_DEVLINK,lock,50.0,0,,0,0.0,device fault,1,23.3,75.9
+321,701,trust,4,F_DEVLINK,lock,38.1,0,,0,0.0,device fault,1,14.9,75.3
+321,701,trust,5,C_SEVERE,phone|tv,100.0,4,5.7,4,155.9,jam,1,44.9,84.5
+321,701,trust,6,C_BORDER,phone,58.6,2,12.1,1,94.9,jam,1,38.0,80.2
+321,701,trust,7,F_WAN,wan,16.0,0,,0,0.0,internet fault,1,71.7,124.1
+321,701,trust,8,C_BORDER,tv,44.3,1,7.6,1,36.6,jam,1,19.9,71.2
+321,701,trust,9,C_SEVERE,laptop|phone,32.6,3,8.7,2,37.8,jam,1,85.6,568.6
+321,701,trust,10,C_SEVERE,phone|tv,54.8,2,5.8,2,93.8,jam,1,23.9,72.5
+321,701,trust,11,F_DEVLINK,doorbell,32.1,0,,0,32.1,device fault,1,26.0,72.7
+321,701,trust,12,F_WAN,wan,26.0,0,,0,0.0,internet fault,1,95.1,181.8
+322,702,trust,1,C_SEVERE,laptop|phone|tv,43.1,3,7.3,3,71.0,jam,1,77.9,581.9
+322,702,trust,2,C_SEVERE,laptop|tv,51.4,2,6.4,2,86.3,jam,1,23.4,71.4
+322,702,trust,3,C_BORDER,phone,33.7,1,3.5,1,63.9,jam,1,20.9,70.4
+322,702,trust,4,C_BORDER,tv,26.8,1,10.6,1,16.2,jam,1,23.3,72.5
+322,702,trust,5,C_BORDER,phone,31.3,1,4.8,1,29.3,jam,1,43.9,101.6
+322,702,trust,6,C_BORDER,tv,47.5,1,4.2,1,43.3,jam,1,8.4,71.3
+322,702,trust,7,C_BORDER,phone,59.2,3,15.2,1,95.3,jam,1,8.9,75.1
+322,702,trust,8,C_BORDER,phone,65.4,2,4.3,1,115.7,jam,1,13.7,75.3
+322,702,trust,9,F_DEVLINK,camera,35.0,0,,0,0.0,device fault,1,17.4,73.4
+322,702,trust,10,F_DEVLINK,thermostat,49.0,0,,0,0.0,device fault,1,21.7,72.8
+322,702,trust,11,C_SEVERE,laptop|phone|tv,99.6,6,5.5,6,220.1,jam,1,49.5,82.6
+322,702,trust,12,F_DEVLINK,doorbell,30.0,0,,0,43.9,device fault,1,12.6,70.4
+323,703,trust,1,C_SEVERE,laptop|phone,37.5,2,4.0,2,57.1,jam,1,53.8,168.5
+323,703,trust,2,C_BORDER,phone,25.5,1,5.3,1,20.2,jam,1,22.9,75.8
+323,703,trust,3,C_BORDER,phone,55.1,2,4.2,1,70.1,jam,1,14.3,72.9
+323,703,trust,4,C_SEVERE,laptop|tv,49.3,2,5.7,2,77.0,jam,1,44.3,73.9
+323,703,trust,5,F_WAN,wan,20.0,1,0.7,0,24.2,internet fault,1,92.4,158.1
+323,703,trust,6,C_SEVERE,phone|tv,60.2,2,5.2,2,110.1,jam,1,11.3,69.8
+323,703,trust,7,C_BORDER,phone,67.7,2,6.7,1,121.1,jam,1,22.5,73.8
+323,703,trust,8,C_SEVERE,laptop|phone|tv,77.2,4,3.7,4,186.7,jam,1,52.4,83.6
+323,703,trust,9,F_DEVLINK,lock,46.0,0,,0,82.1,device fault,1,17.3,70.3
+323,703,trust,10,F_DEVLINK,camera,41.0,1,22.0,0,30.6,device fault,1,10.0,68.5
+323,703,trust,11,C_BORDER,phone,38.9,2,6.6,1,50.4,jam,1,19.5,76.8
+323,703,trust,12,C_BORDER,phone,53.4,2,6.6,1,75.0,jam,1,29.8,85.0

@@ -7,9 +7,15 @@ Every 2 seconds Agent 1 proposes and Agent 2 verifies. Then the actor:
   - undoes everything when it stops (Ctrl+C)
 Every tick and every action is written to data/live/agent_log.jsonl.
 
+Three modes, for the experiment (same code, only who decides changes):
+    --mode trust     Agent 1 proposes, Agent 2 checks, then act   (trust-aware, the default)
+    --mode predict   act on every Agent 1 proposal, no check       (prediction-only)
+    --mode none      never act, only watch and log                 (no agent)
+
 Needs root (ovs-vsctl). Run from the project root, with the network running:
-    sudo .venv/bin/python -m agent.run_agent
+    sudo .venv/bin/python -m agent.run_agent --mode trust
 """
+import argparse
 import json
 import os
 import time
@@ -26,6 +32,7 @@ RATE = POLICY['min_rate_mbit']          # slow to the lowest speed the homeowner
 RECHECK = POLICY['recheck_every_s']     # check 10 s after acting
 MAX_SLOW = POLICY['max_slow_s']         # undo after 60 s
 THRESHOLDS = 'config_ubuntu.yaml'       # this host's normal delays (config.yaml = Kali, used for training)
+MODES = ['trust', 'predict', 'none']
 
 
 class Actor:
@@ -88,18 +95,36 @@ class Actor:
             self.undo_one(dev, reason)
 
 
+def decide(mode, proposal, verdict, kind):
+    """What the actor is told to do, depending on the mode."""
+    if mode == 'trust':                              # Agent 2 decides
+        return verdict, kind
+    if mode == 'predict':                            # Agent 1 alone: every warning is treated as a jam
+        if proposal['action'] == 'slow':
+            return 'APPROVE', 'jam'
+        return 'OK', 'ok'
+    return 'OK', kind                                # none: never act
+
+
 def main():
+    p = argparse.ArgumentParser()
+    p.add_argument('--mode', choices=MODES, default='trust')
+    p.add_argument('--log', default=LOG, help='where to write the log')
+    args = p.parse_args()
+
     make_live_folder()
     thresholds = label.read_thresholds(THRESHOLDS)
     print(f'normal delays from {THRESHOLDS}', flush=True)
-    os.makedirs(os.path.dirname(LOG), exist_ok=True)
-    log = open(LOG, 'w')                            # a fresh log for every run
+    os.makedirs(os.path.dirname(args.log), exist_ok=True)
+    log = open(args.log, 'w')                       # a fresh log for every run
+    log.write(json.dumps({'t': round(time.time(), 2), 'event': 'START', 'mode': args.mode,
+                          'thresholds': THRESHOLDS}) + '\n')
     for dev in PORTS:                               # start clean: no old limits left
         undo(dev)
     actor = Actor(log)
     history = deque(maxlen=5)
     last_warned = []
-    print(f'Agents running and ACTING: line full at {FULL}, slow to {RATE} Mbit/s, '
+    print(f'MODE {args.mode}: line full at {FULL}, slow to {RATE} Mbit/s, '
           f'check after {RECHECK} s, undo after {MAX_SLOW} s', flush=True)
     try:
         while True:
@@ -128,7 +153,7 @@ def main():
                     'top': snap['top_sender'], 'now': history[-1], 'steady': kind,
                     'a1': p, 'a2': verdict, 'why': why, 'tell': tell,
                     'slowed': list(actor.slowed)}) + '\n')
-                actor.step(verdict, kind, snap)
+                actor.step(*decide(args.mode, proposal, verdict, kind), snap)
             time.sleep(max(0, INTERVAL - (time.time() - t)))
     except KeyboardInterrupt:
         print('\nstopping', flush=True)

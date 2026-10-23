@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Home Network Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css?v=4.5">
+<link rel="stylesheet" href="css/layout.css?v=4.5">
+<link rel="stylesheet" href="css/parts.css?v=4.5">
+<link rel="stylesheet" href="css/trust.css?v=4.5">
+<link rel="stylesheet" href="css/pages.css?v=4.5">
+</head>
+<body>
+<header class="bar">
+  <a class="mark" href="#/" aria-label="Overview">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 15 16 5l12 10v12H4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M10 22h12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="16" cy="22" r="2.6" fill="var(--agent)"/></svg>
+    <span>Home network agent</span>
+  </a>
+  <nav aria-label="Pages">
+    <a href="#/" data-page="overview">Overview</a>
+    <a href="#/decisions" data-page="decisions">Decisions</a>
+    <a href="#/compare" data-page="compare">Compare</a>
+    <a href="#/model" data-page="model">Prediction</a>
+    <a href="#/devices" data-page="devices">Devices</a>
+    <a href="#/rules" data-page="rules">Rules</a>
+  </nav>
+  <div class="pulse" id="pulse"><i></i><span id="pulseText">Connecting</span></div>
+</header>
+
+<!-- where the numbers come from: the running testbed, or a recorded run -->
+<div class="sourcebar" id="sourcebar">
+  <div class="seg" role="group" aria-label="Data source">
+    <button type="button" data-src="live" aria-pressed="true">Live testbed</button>
+    <button type="button" data-src="replay" aria-pressed="false">Replay a recorded run</button>
+  </div>
+
+  <div class="src-live" id="liveCtl">
+    <span class="fresh" id="fresh">Waiting for data</span>
+    <div class="agentctl">
+      <span class="lbl">Agent</span>
+      <div class="seg small" role="group" aria-label="Agent mode" id="modePick">
+        <button type="button" data-mode="trust" aria-pressed="true">Trust-aware</button>
+        <button type="button" data-mode="predict" aria-pressed="false">Prediction-only</button>
+        <button type="button" data-mode="none" aria-pressed="false">Watch only</button>
+      </div>
+      <button type="button" class="btn go" id="agentStart">Start agent</button>
+      <button type="button" class="btn stop" id="agentStop">Stop agent</button>
+    </div>
+    <details class="tryit">
+      <summary>How to cause a problem</summary>
+      <div class="tryit-body">
+        <p>Type these at the <code>mininet&gt;</code> prompt. Wait for one to end before the next.</p>
+        <dl>
+          <dt><code>congest severe</code></dt><dd>2 or 3 devices flood the line: a real jam. The agent should slow a flooder.</dd>
+          <dt><code>congest border</code></dt><dd>1 device floods at 5 to 9 Mbit/s: sometimes a jam.</dd>
+          <dt><code>fault wan</code></dt><dd>The internet cable gets slow. The line is not full, so the trust check should refuse.</dd>
+          <dt><code>fault devlink</code></dt><dd>One protected device's own cable fails. The trust check should refuse and name it.</dd>
+          <dt><code>stopflood</code>, <code>stopfault</code></dt><dd>End the event early.</dd>
+        </dl>
+      </div>
+    </details>
+  </div>
+
+  <div class="src-replay" id="replayCtl" hidden>
+    <label class="pick"><span class="lbl">Run</span><select id="sessionPick" aria-label="Recorded run"></select></label>
+    <button type="button" class="btn icon" id="playBtn" aria-label="Play">Play</button>
+    <label class="pick"><span class="lbl">Speed</span>
+      <select id="speedPick" aria-label="Playback speed"><option value="1">1×</option><option value="5">5×</option><option value="10" selected>10×</option><option value="30">30×</option></select>
+    </label>
+    <div class="scrub" id="scrub">
+      <svg id="scrubMarks" aria-hidden="true"></svg>
+      <input type="range" id="scrubRange" min="0" max="1000" value="0" step="1" aria-label="Position in the run">
+    </div>
+    <span class="clockpos" id="replayPos">0:00 of 0:00</span>
+  </div>
+</div>
+<p class="ctl-msg" id="ctlMsg" role="status" hidden></p>
+
+<main>
+  <!-- OVERVIEW -->
+  <section class="page" id="page-overview">
+    <div class="agentbar" id="story" data-tone="idle">
+      <svg class="robot" id="robot" viewBox="0 0 120 120" aria-hidden="true">
+        <g class="bot">
+          <line class="antenna" x1="60" y1="22" x2="60" y2="10"/>
+          <circle class="ant-ball" cx="60" cy="8" r="5"/>
+          <rect class="head" x="26" y="22" width="68" height="50" rx="16"/>
+          <rect class="face" x="34" y="31" width="52" height="32" rx="10"/>
+          <g class="eyes">
+            <g class="eye-l"><ellipse class="eye" cx="49" cy="45" rx="6" ry="7"/></g>
+            <g class="eye-r"><ellipse class="eye" cx="71" cy="45" rx="6" ry="7"/></g>
+          </g>
+          <rect class="mouth" x="52" y="55" width="16" height="3" rx="1.5"/>
+          <rect class="ear" x="19" y="40" width="7" height="14" rx="3"/>
+          <rect class="ear" x="94" y="40" width="7" height="14" rx="3"/>
+          <rect class="body" x="38" y="76" width="44" height="30" rx="10"/>
+          <circle class="light" cx="60" cy="91" r="5"/>
+          <rect class="arm arm-l" x="25" y="80" width="10" height="22" rx="5"/>
+          <rect class="arm arm-r" x="85" y="80" width="10" height="22" rx="5"/>
+        </g>
+      </svg>
+      <p class="say" id="storyHead" role="status" aria-live="polite">Waiting for the network.</p>
+    </div>
+
+    <!-- the trust decision: the research contribution, step by step -->
+    <section class="panel trust" id="trust" data-verdict="none" aria-label="The trust decision">
+      <div class="trust-col predict">
+        <h2>Agent 1 predicts</h2>
+        <div class="prob">
+          <span class="prob-num" id="tProb">–</span>
+          <span class="prob-cap">chance a protected device<br>degrades in the next 6 s</span>
+        </div>
+        <div class="probbar" aria-hidden="true"><span id="tProbFill"></span><i id="tProbMark"></i></div>
+        <p class="probscale"><span>0</span><span id="tProbThr">acts from 0.50</span><span>1</span></p>
+        <div class="proposal">
+          <span class="who">Proposal</span>
+          <strong id="tProposal">Nothing</strong>
+          <span class="why" id="tProposalWhy"></span>
+        </div>
+        <div class="warned">
+          <span class="who">Protected devices at risk</span>
+          <ul id="tWarned"></ul>
+        </div>
+      </div>
+      <div class="trust-col checks">
+        <h2>Agent 2, the trust check</h2>
+        <ol class="checklist" id="tChecks"></ol>
+      </div>
+      <div class="trust-col verdict">
+        <h2>Decision</h2>
+        <p class="verdict-word" id="tVerdict">–</p>
+        <p class="verdict-reason" id="tReason"></p>
+        <p class="verdict-acted" id="tActed"></p>
+        <div class="homeowner" id="tTellBox" hidden>
+          <span class="who">Message to the homeowner</span>
+          <p id="tTell"></p>
+        </div>
+        <div class="msglog">
+          <span class="who">Messages to the homeowner in this run</span>
+          <ol id="tMsgs"></ol>
+        </div>
+        <p class="verdict-mode" id="tMode"></p>
+      </div>
+    </section>
+
+    <div class="overview-grid">
+      <figure class="panel house-panel">
+        <figcaption><h2>The house right now</h2><span class="aside" id="houseAside"></span></figcaption>
+        <svg id="house" viewBox="0 0 920 490" role="img" aria-label="Map of the home network"></svg>
+      </figure>
+
+      <figure class="panel camera-panel" id="camPanel">
+        <figcaption><h2>The camera</h2><span class="aside">the device the paper protects first</span></figcaption>
+        <dl class="camnow">
+          <div><dt>Delay now</dt><dd id="camRtt">–</dd><span class="sub" id="camRttSub"></span></div>
+          <div><dt>Ping loss, last minute</dt><dd id="camLoss">–</dd><span class="sub" id="camLossSub"></span></div>
+        </dl>
+        <div id="camChart" class="chart"></div>
+        <ul class="key small">
+          <li><i class="k-line-ok"></i>delay</li><li><i class="k-dot-jam"></i>ping lost</li>
+          <li><i class="k-jam"></i>jam</li><li><i class="k-fault"></i>fault</li><li><i class="k-slow"></i>slowed a device</li>
+        </ul>
+        <div class="camlast" id="camLast"></div>
+      </figure>
+    </div>
+
+    <figure class="panel ribbon-panel">
+      <figcaption>
+        <h2>The last 10 minutes</h2>
+        <ul class="key" aria-label="Legend">
+          <li><i class="k-jam"></i>Agent 2 named a jam</li><li><i class="k-fault"></i>named a fault</li>
+          <li><i class="k-want"></i>Agent 1 wanted to slow</li><li><i class="k-allow"></i>trust check allowed</li>
+        </ul>
+      </figcaption>
+      <div id="ribbon" class="ribbon"></div>
+    </figure>
+  </section>
+
+  <!-- DECISIONS: the audit trail -->
+  <section class="page" id="page-decisions">
+    <div class="page-head">
+      <h1>Decisions</h1>
+      <p id="decSub">Every slow-down and every refusal, with what the camera felt before and after. Newest first. Select a row to see every check.</p>
+    </div>
+    <div class="toolbar">
+      <div class="seg small" role="group" aria-label="Show" id="decFilter">
+        <button type="button" data-f="all" aria-pressed="true">All</button>
+        <button type="button" data-f="slow" aria-pressed="false">Slow-downs</button>
+        <button type="button" data-f="refuse" aria-pressed="false">Refusals</button>
+        <button type="button" data-f="problem" aria-pressed="false">Wrong or missed</button>
+      </div>
+      <dl class="counts" id="decCounts"></dl>
+      <div class="exports">
+        <a class="btn" id="decCsv" download>Export CSV</a>
+        <a class="btn" id="decJson" download>Export JSON</a>
+      </div>
+    </div>
+    <div class="panel table-panel"><table class="audit" id="audit"></table></div>
+  </section>
+
+  <!-- COMPARE: gated vs ungated -->
+  <section class="page" id="page-compare">
+    <div class="page-head">
+      <h1 id="cmpHead">Comparing the three agents</h1>
+      <p id="cmpBanner"></p>
+    </div>
+
+    <div class="cmp-top">
+      <figure class="panel">
+        <figcaption><h2>The trade-off in one picture</h2><span class="aside">top left is best</span></figcaption>
+        <div id="tradeoff" class="chart"></div>
+        <p class="note" id="tradeNote"></p>
+      </figure>
+      <figure class="panel">
+        <figcaption><h2>What each agent is good and bad at</h2></figcaption>
+        <div class="table-panel"><table class="plain keytable" id="keyTable"></table></div>
+        <p class="note">Best value in each row is marked. No agent is never wrong because it never acts, so compare prediction-only with trust-aware. Every measure is in the list below.</p>
+      </figure>
+    </div>
+
+    <details class="panel events-detail">
+      <summary><h2>All 16 measures</h2></summary>
+      <div class="measures" id="measures"></div>
+    </details>
+    <div class="cmp-grid">
+      <figure class="panel">
+        <figcaption><h2>Bad readings by event type</h2><span class="aside">share of readings slow or lost</span></figcaption>
+        <div class="table-panel"><table class="plain" id="byType"></table></div>
+      </figure>
+      <figure class="panel">
+        <figcaption><h2>Where the numbers come from</h2></figcaption>
+        <div id="cmpSources" class="note-list"></div>
+        <div class="exports">
+          <a class="btn" href="/api/export/compare.csv" download>Export comparison CSV</a>
+          <a class="btn" href="/api/export/camera_events.csv" download>Export camera per event CSV</a>
+        </div>
+      </figure>
+    </div>
+    <details class="panel events-detail">
+      <summary><h2>Every event in every run</h2></summary>
+      <div class="table-panel"><table class="plain small" id="cmpEvents"></table></div>
+    </details>
+  </section>
+
+  <!-- MODEL: is the prediction reliable, and why 0.5? -->
+  <section class="page" id="page-model">
+    <div class="page-head">
+      <h1>How reliable is Agent 1?</h1>
+      <p id="modelSub">Agent 1's warning, how it changes with the threshold, and whether a warning of 0.8 really means 80%.</p>
+    </div>
+    <figure class="panel">
+      <figcaption><h2>Agent 1's warning over the last 10 minutes</h2><span class="aside" id="probNow"></span></figcaption>
+      <div id="probChart" class="chart"></div>
+    </figure>
+    <div class="model-grid">
+      <figure class="panel">
+        <figcaption><h2>Choosing the threshold</h2><span class="aside">Agent 1 alone, on the recorded no-agent runs</span></figcaption>
+        <div id="sweepChart" class="chart"></div>
+        <ul class="key small">
+          <li><i class="k-line-ok"></i>jams warned in time</li><li><i class="k-line-fault"></i>faults warned (wrong to act)</li>
+          <li><i class="k-line-agent"></i>calm false alarms per hour (right scale)</li>
+        </ul>
+        <label class="thr"><span>Threshold <b id="thrVal">0.50</b></span><input type="range" id="thrRange" min="1" max="19" value="10" aria-label="Threshold"></label>
+        <dl class="totals four" id="thrStats"></dl>
+        <p class="note" id="sweepNote"></p>
+        <div class="exports"><a class="btn" href="/api/export/sweep.csv" download>Export sweep CSV</a></div>
+      </figure>
+      <figure class="panel">
+        <figcaption><h2>Does the warning mean what it says?</h2><span class="aside">calibration</span></figcaption>
+        <div id="calChart" class="chart"></div>
+        <dl class="totals three" id="calStats"></dl>
+        <p class="note" id="calNote"></p>
+      </figure>
+    </div>
+    <figure class="panel">
+      <figcaption><h2>Offline scores from training</h2><span class="aside" id="offSrc"></span></figcaption>
+      <div class="table-panel"><table class="plain" id="offline"></table></div>
+      <p class="note" id="offNote"></p>
+    </figure>
+  </section>
+
+  <!-- RULES: the homeowner's policy -->
+  <section class="page" id="page-rules">
+    <div class="page-head">
+      <h1>Homeowner rules</h1>
+      <p>What the agent may do. Saved to models/homeowner_policy.json. The agent reads it when it starts.</p>
+    </div>
+    <form class="rules" id="rulesForm" autocomplete="off">
+      <fieldset class="panel">
+        <legend>Devices the agent may slow</legend>
+        <div class="toggles" id="rMay"></div>
+        <p class="hint">Only these three have a switch port the agent can limit. If none is ticked, the agent can never act.</p>
+      </fieldset>
+
+      <fieldset class="panel">
+        <legend>How it slows</legend>
+        <label class="num"><span>Slow to</span><input type="number" id="rRate" min="1" max="10" step="0.5"><em>Mbit/s</em></label>
+        <p class="hint">The experiment used 2. Under 2, TCP devices get much less than the limit.</p>
+        <label class="num"><span>Undo after</span><input type="number" id="rMax" min="20" max="300" step="5"><em>seconds</em></label>
+        <label class="num"><span>Check again after</span><input type="number" id="rCheck" min="4" max="30" step="1"><em>seconds</em></label>
+        <p class="hint">After acting, the agent checks once. If the jam is still there it slows the next sender.</p>
+      </fieldset>
+
+      <fieldset class="panel">
+        <legend>Tell the homeowner about</legend>
+        <div class="toggles" id="rTell"></div>
+      </fieldset>
+
+      <fieldset class="panel">
+        <legend>Protected devices</legend>
+        <div class="imp-grid" id="rImp"></div>
+        <p class="hint">Never slowed. Importance is shown on the dashboard; the agent does not use it yet.</p>
+      </fieldset>
+
+      <div class="rules-bar">
+        <button type="submit" class="btn go" id="rSave">Save rules</button>
+        <button type="button" class="btn" id="rUndo">Undo my edits</button>
+        <button type="button" class="btn" id="rReset">Back to the experiment's rules</button>
+        <button type="button" class="btn" id="rRestart" hidden>Restart agent with these rules</button>
+        <p class="rules-msg" id="rMsg" role="status"></p>
+      </div>
+      <div class="panel changed" id="rChanged"></div>
+    </form>
+  </section>
+
+  <!-- DEVICES -->
+  <section class="page" id="page-devices">
+    <div class="page-head">
+      <h1>Devices</h1>
+      <p>Each device is compared with its own normal delay, measured on this machine. Select a device to see its history.</p>
+    </div>
+    <div class="panel table-panel"><table class="devtable" id="devtable"></table></div>
+  </section>
+
+  <!-- ONE DEVICE -->
+  <section class="page" id="page-device">
+    <div class="page-head">
+      <a class="back" href="#/devices">All devices</a>
+      <h1 id="devName">–</h1>
+      <p id="devSub"></p>
+    </div>
+    <div class="range" id="devRange" role="group" aria-label="Time range"></div>
+    <div class="dev-grid">
+      <figure class="panel"><figcaption><h2>Delay to the cloud</h2><span class="aside" id="devRttNow"></span></figcaption><div id="devRtt" class="chart tall"></div></figure>
+      <figure class="panel"><figcaption><h2>Upload</h2><span class="aside" id="devTxNow"></span></figcaption><div id="devTx" class="chart"></div></figure>
+      <figure class="panel"><figcaption><h2>Ping loss</h2><span class="aside" id="devLossNow"></span></figcaption><div id="devLoss" class="chart"></div></figure>
+    </div>
+  </section>
+</main>
+
+<div class="tip" id="tip" role="status" hidden></div>
+
+<script src="js/util.js?v=4.5"></script>
+<script src="js/chart.js?v=4.5"></script>
+<script src="js/story.js?v=4.5"></script>
+<script src="js/trust.js?v=4.5"></script>
+<script src="js/house.js?v=4.5"></script>
+<script src="js/camera.js?v=4.5"></script>
+<script src="js/ribbon.js?v=4.5"></script>
+<script src="js/devices.js?v=4.5"></script>
+<script src="js/decisions.js?v=4.5"></script>
+<script src="js/compare.js?v=4.5"></script>
+<script src="js/model.js?v=4.5"></script>
+<script src="js/rules.js?v=4.5"></script>
+<script src="js/source.js?v=4.5"></script>
+<script src="js/app.js?v=4.5"></script>
+</body>
+</html>

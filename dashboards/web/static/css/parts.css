@@ -1,0 +1,240 @@
+/* parts.css - the pieces: the headline, panels, the house map, the ribbon, tables and charts. */
+
+/* ---------- the headline that tells the story of the moment */
+.story { position: relative; padding: var(--s2) 0 var(--s2) var(--s5); max-width: 1100px; }
+.story::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 5px; border-radius: 3px; background: var(--ink-3); transition: background .4s; }
+.story[data-tone="calm"]::before { background: var(--ok); }
+.story[data-tone="watch"]::before { background: var(--watch); }
+.story[data-tone="jam"]::before { background: var(--jam); }
+.story[data-tone="fault"]::before { background: var(--fault); }
+.story-mode { font-size: var(--t-sm); color: var(--ink-3); margin-bottom: var(--s1); }
+.story h1 {
+  font-size: var(--t-hero); line-height: 1.12; font-weight: 640;
+  font-variation-settings: "wdth" 112; letter-spacing: -.015em; text-wrap: balance;
+}
+.story-sub { margin-top: var(--s3); font-size: var(--t-lg); color: var(--ink-2); max-width: 70ch; text-wrap: pretty; }
+.story.changed h1 { animation: settle .6s ease-out; }
+@keyframes settle { from { opacity: .35; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* ---------- panels */
+.panel { margin: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r-panel); padding: var(--s4) var(--s5) var(--s5); min-width: 0; }
+.panel h2 { font-size: var(--t-md); font-weight: 620; }
+.panel figcaption { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s3); }
+.aside { color: var(--ink-3); font-size: var(--t-sm); }
+.gap { margin-top: var(--s5); }
+.note { color: var(--ink-2); font-size: var(--t-sm); margin-top: var(--s2); max-width: 60ch; }
+
+/* ---------- the last decision: three linked steps */
+.decision { display: flex; flex-direction: column; }
+.decision .readings { margin-top: auto; }
+.decision h2 { margin-bottom: var(--s4); }
+.chain { list-style: none; margin: 0; padding: 0; position: relative; }
+.chain::before { content: ""; position: absolute; left: 6px; top: 10px; bottom: 26px; width: 2px; background: var(--rule); }
+.chain li { position: relative; padding: 0 0 var(--s4) var(--s5); display: grid; gap: 2px; }
+.chain li::before { content: ""; position: absolute; left: 0; top: 5px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); border: 2px solid var(--ink-3); }
+.chain li[data-state="propose"]::before { border-color: var(--agent); }
+.chain li[data-state="allow"]::before { background: var(--agent); border-color: var(--agent); }
+.chain li[data-state="refuse"]::before { border-color: var(--fault); background: var(--fault); }
+.chain li[data-state="calm"]::before { border-color: var(--ok); }
+.who { font-size: var(--t-xs); color: var(--ink-3); }
+.chain strong { font-size: var(--t-lg); font-weight: 650; }
+.why { font-size: var(--t-sm); color: var(--ink-2); }
+.homeowner { border-left: 3px solid var(--fault); padding: var(--s2) 0 var(--s2) var(--s3); margin: var(--s1) 0 var(--s4); }
+.homeowner p { font-weight: 600; margin-top: 2px; }
+.readings { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s3); margin: 0; padding-top: var(--s4); border-top: 1px solid var(--rule); }
+.readings dt { font-size: var(--t-xs); color: var(--ink-3); }
+.readings dd { margin: 2px 0 0; font-size: var(--t-xl); font-weight: 600; font-variation-settings: "wdth" 80; font-variant-numeric: tabular-nums; }
+
+/* ---------- the house map */
+.house-panel svg { width: 100%; height: auto; display: block; }
+#house text { font-family: var(--font); fill: var(--ink); }
+#house .group-label { fill: var(--ink-3); font-size: 13px; }
+#house .dev rect { fill: var(--surface-2); stroke: var(--rule); stroke-width: 1.2; }
+#house .dev .name { font-size: 14px; font-weight: 600; }
+#house .dev .val { font-size: 12px; fill: var(--ink-2); font-variant-numeric: tabular-nums; }
+#house .dev .dot { fill: var(--ink-3); }
+#house .dev.healthy .dot { fill: var(--ok); }
+#house .dev.warning .dot { fill: var(--watch); }
+#house .dev.critical .dot { fill: var(--jam); }
+#house .dev.critical rect { stroke: var(--jam); }
+#house .dev.slowed rect { stroke: var(--agent); stroke-width: 2; fill: #2c2a26; }
+#house .dev.slowed .val { fill: var(--agent); }
+#house .dev { cursor: pointer; }
+#house .dev:hover rect, #house .dev:focus rect { stroke: var(--ink-2); }
+#house .wire { fill: none; stroke: var(--rule); stroke-width: 2; }
+#house .wire.flow { stroke: #4a5d70; stroke-dasharray: 3 9; animation: flow linear infinite; }
+#house .wire.slowed { stroke: var(--agent); stroke-dasharray: 2 6; }
+#house .wire.critical { stroke: var(--jam); }
+@keyframes flow { to { stroke-dashoffset: -24; } }
+#house .node rect { fill: var(--surface-2); stroke: var(--ink-3); stroke-width: 1.2; }
+#house .node .name { font-size: 14px; font-weight: 650; }
+#house .node .sub { font-size: 11.5px; fill: var(--ink-3); }
+#house .pipe-bg { fill: var(--bg); stroke: var(--rule); }
+#house .pipe-fill { fill: var(--ok); transition: width .6s ease, fill .4s; }
+#house .pipe-fill.busy { fill: var(--watch); }
+#house .pipe-fill.full { fill: var(--jam); }
+#house .pipe-mark { stroke: var(--ink); stroke-width: 2; }
+#house .pipe-label { font-size: 12px; fill: var(--ink-2); }
+#house .pipe-value { font-size: 26px; font-weight: 650; font-variation-settings: "wdth" 80; font-variant-numeric: tabular-nums; }
+#house .gate rect { fill: none; stroke: var(--ink-3); stroke-dasharray: 4 4; }
+#house .gate.acting rect { stroke: var(--agent); stroke-dasharray: none; fill: var(--agent-wash); }
+#house .gate.refusing rect { stroke: var(--fault); stroke-dasharray: none; fill: var(--fault-wash); }
+#house .gate .name { font-size: 13px; font-weight: 650; }
+#house .gate .sub { font-size: 12px; fill: var(--ink-2); }
+
+/* ---------- the ribbon (last 10 minutes) */
+.key { list-style: none; display: flex; flex-wrap: wrap; gap: var(--s4); margin: 0; padding: 0; font-size: var(--t-sm); color: var(--ink-2); }
+.key i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.key .k-jam { background: var(--jam-wash); outline: 1px solid var(--jam); }
+.key .k-fault { background: var(--fault-wash); outline: 1px solid var(--fault); }
+.key .k-want { background: none; outline: 1.5px solid var(--agent); }
+.key .k-allow { background: var(--agent); }
+.ribbon svg { display: block; width: 100%; }
+.ribbon text { font-family: var(--font); fill: var(--ink-3); font-size: 12px; }
+.ribbon .track-label { fill: var(--ink-2); font-size: 12.5px; }
+.ribbon .grid { stroke: var(--rule); }
+.ribbon .area { fill: rgba(92, 202, 166, .18); }
+.ribbon .line { fill: none; stroke: var(--ok); stroke-width: 2; }
+.ribbon .limit { stroke: var(--jam); stroke-dasharray: 5 4; }
+.ribbon .jam { fill: var(--jam-wash); }
+.ribbon .fault { fill: var(--fault-wash); }
+.ribbon .want { fill: none; stroke: var(--agent); stroke-width: 1.5; }
+.ribbon .allow { fill: var(--agent); }
+.ribbon .slow-bar { fill: var(--agent); }
+.ribbon .lane { fill: var(--surface-2); }
+.ribbon .cursor { stroke: var(--ink-2); stroke-width: 1; }
+.ribbon .empty { fill: var(--ink-3); font-size: 14px; }
+
+/* ---------- device table */
+.devtable { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
+.devtable th { text-align: left; font-weight: 550; color: var(--ink-3); font-size: var(--t-xs); padding: var(--s2) var(--s3); border-bottom: 1px solid var(--rule); }
+.devtable td { padding: var(--s3); border-bottom: 1px solid var(--rule); vertical-align: middle; font-variant-numeric: tabular-nums; }
+.devtable tbody tr { cursor: pointer; }
+.devtable tbody tr:hover td, .devtable tbody tr:focus-within td { background: var(--surface-2); }
+.devtable tr:last-child td { border-bottom: 0; }
+.devtable .dname { font-weight: 650; font-size: var(--t-md); text-decoration: none; }
+.devtable .kind { color: var(--ink-3); font-size: var(--t-xs); display: block; }
+.state { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
+.state.healthy::before { background: var(--ok); }
+.state.warning::before { background: var(--watch); }
+.state.critical::before { background: var(--jam); }
+.state.slowed { color: var(--agent); }
+.state.slowed::before { background: var(--agent); }
+.delaybar { display: inline-block; vertical-align: middle; position: relative; width: 140px; height: 8px; border-radius: 4px; background: var(--surface-2); }
+.delaybar span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--ok); }
+.delaybar span.over { background: var(--watch); }
+.delaybar span.bad { background: var(--jam); }
+.delaybar i { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+.delaynum { font-weight: 600; margin-right: var(--s2); }
+.spark { width: 140px; height: 30px; display: block; }
+.spark path { fill: none; stroke: var(--ink-2); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.spark line { stroke: var(--ink-3); stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; }
+
+/* ---------- charts (device page) */
+.chart svg { display: block; width: 100%; }
+.chart text { font-family: var(--font); fill: var(--ink-3); font-size: 12px; }
+.chart .grid { stroke: var(--rule); }
+.chart .guide { stroke-dasharray: 5 4; }
+.chart .series { fill: none; stroke-width: 2; }
+.chart .cursor { stroke: var(--ink-2); }
+.range { display: flex; gap: var(--s1); margin-bottom: var(--s4); }
+.range button {
+  font: inherit; font-size: var(--t-sm); color: var(--ink-2); background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 8px; padding: 6px 12px; cursor: pointer;
+}
+.range button[aria-pressed="true"] { color: var(--ink); background: var(--surface-2); border-color: var(--ink-3); }
+
+/* ---------- activity log */
+.log { list-style: none; margin: 0; padding: 0; }
+.log li { display: grid; grid-template-columns: 80px 1fr; gap: var(--s3); padding: var(--s3) 0; border-bottom: 1px solid var(--rule); }
+.log li:last-child { border-bottom: 0; }
+.log time { color: var(--ink-3); font-variant-numeric: tabular-nums; font-size: var(--t-sm); padding-top: 2px; }
+.log strong { font-weight: 650; }
+.log .ev-SLOW strong { color: var(--agent); }
+.log .ev-UNDO strong { color: var(--ok); }
+.log .ev-ERROR strong { color: var(--jam); }
+.log .detail { color: var(--ink-2); font-size: var(--t-sm); }
+.log .empty { display: block; color: var(--ink-2); padding: var(--s4) 0; }
+.totals { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4) var(--s3); margin: var(--s3) 0 0; }
+.totals dt { font-size: var(--t-xs); color: var(--ink-3); }
+.totals dd { margin: 2px 0 0; font-size: var(--t-xl); font-weight: 600; font-variation-settings: "wdth" 80; font-variant-numeric: tabular-nums; }
+
+.table-panel { overflow-x: auto; }
+.chart .slowspan { fill: var(--agent); fill-opacity: .12; }
+.devtable a.dname { color: var(--ink); }
+.devtable a.dname:focus-visible { outline: 2px solid var(--agent); outline-offset: 3px; border-radius: 2px; }
+
+/* ---------- tooltip */
+.tip {
+  position: fixed; z-index: 30; pointer-events: none; min-width: 180px; max-width: 280px;
+  background: #0f171f; border: 1px solid var(--rule); border-radius: 10px; padding: var(--s2) var(--s3);
+  font-size: var(--t-sm); box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+}
+.tip b { display: block; font-weight: 650; margin-bottom: 2px; }
+.tip .row { display: flex; justify-content: space-between; gap: var(--s4); color: var(--ink-2); }
+.tip .row span:last-child { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 720px) {
+  .readings { grid-template-columns: 1fr 1fr; }
+  .devtable .hide-sm { display: none; }
+  .delaybar, .spark { width: 64px; }
+  .devtable td, .devtable th { padding-left: var(--s2); padding-right: var(--s2); }
+  .devtable .delaynum { display: block; margin: 0 0 4px; }
+}
+
+/* ---------- the agent as a small robot that says one line */
+.agentbar { --tone: var(--ink-3); display: flex; align-items: center; gap: var(--s4); margin-bottom: var(--s2); min-height: 92px; }
+.agentbar[data-tone="calm"] { --tone: var(--ok); }
+.agentbar[data-tone="watch"] { --tone: var(--watch); }
+.agentbar[data-tone="jam"] { --tone: var(--agent); }
+.agentbar[data-tone="fault"] { --tone: var(--fault); }
+.robot { width: 92px; height: 92px; flex: none; overflow: visible; }
+.robot .head, .robot .body { fill: var(--surface-2); stroke: var(--tone); stroke-width: 2.5; transition: stroke .4s; }
+.robot .face { fill: #10171e; }
+.robot .eye { fill: var(--tone); transition: fill .4s; }
+.robot .mouth, .robot .light, .robot .ant-ball { fill: var(--tone); transition: fill .4s; }
+.robot .antenna { stroke: var(--tone); stroke-width: 2.5; }
+.robot .ear, .robot .arm { fill: var(--surface-2); stroke: var(--tone); stroke-width: 2; }
+.robot .bot { transform-origin: 60px 100px; animation: float 3.2s ease-in-out infinite; }
+.robot .eyes { transform-origin: 60px 45px; animation: blink 4.5s infinite; }
+.robot .arm-l { transform-origin: 30px 82px; }
+.robot .arm-r { transform-origin: 90px 82px; }
+.robot .mouth { transform-origin: 60px 56.5px; }
+.say {
+  position: relative; margin: 0; padding: 12px 18px; border-radius: 14px; background: var(--surface);
+  border: 1.5px solid var(--tone); font-size: var(--t-lg); font-weight: 600; line-height: 1.35; min-height: 1.35em;
+  transition: border-color .4s; max-width: 68ch;
+}
+.say::before {
+  content: ""; position: absolute; left: -9px; top: 50%; width: 14px; height: 14px; margin-top: -7px;
+  background: var(--surface); border-left: 1.5px solid var(--tone); border-bottom: 1.5px solid var(--tone); transform: rotate(45deg);
+}
+.agentbar.talking .say::after { content: "▍"; color: var(--tone); margin-left: 2px; animation: caret .6s steps(1) infinite; }
+
+/* moods */
+.agentbar.talking .mouth { animation: talk .18s ease-in-out infinite alternate; }
+.agentbar[data-tone="watch"] .eye-l, .agentbar[data-tone="watch"] .eye-r { animation: scan 2.4s ease-in-out infinite; }
+.agentbar[data-tone="watch"] .ant-ball { animation: pulse-ball 1s ease-in-out infinite; }
+.agentbar[data-tone="jam"] .arm-r { animation: wave .9s ease-in-out infinite alternate; }
+.agentbar[data-tone="jam"] .ant-ball { animation: pulse-ball .5s ease-in-out infinite; }
+.agentbar[data-tone="jam"] .light { animation: pulse-ball .5s ease-in-out infinite; }
+.agentbar[data-tone="fault"] .bot { animation: shake .5s ease-in-out 2, float 3.2s ease-in-out 1s infinite; }
+.agentbar[data-tone="fault"] .arm-l, .agentbar[data-tone="fault"] .arm-r { transform: rotate(var(--shrug, 0deg)); }
+.agentbar[data-tone="fault"] .arm-l { --shrug: 35deg; }
+.agentbar[data-tone="fault"] .arm-r { --shrug: -35deg; }
+.agentbar[data-tone="idle"] .eyes { transform: scaleY(.15); animation: none; }
+.agentbar[data-tone="idle"] .bot { animation: none; }
+
+@keyframes float { 50% { transform: translateY(-3px); } }
+@keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@keyframes talk { from { transform: scaleY(1); } to { transform: scaleY(2.6); } }
+@keyframes scan { 0%, 100% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
+@keyframes wave { from { transform: rotate(0deg); } to { transform: rotate(-150deg); } }
+@keyframes shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-7deg); } 75% { transform: rotate(7deg); } }
+@keyframes pulse-ball { 50% { opacity: .35; } }
+@keyframes caret { 50% { opacity: 0; } }
+@media (max-width: 720px) {
+  .robot { width: 64px; height: 64px; }
+  .say { font-size: var(--t-md); padding: 10px 14px; }
+}

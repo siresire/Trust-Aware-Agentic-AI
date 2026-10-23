@@ -1,0 +1,39 @@
+/* tokens.css - colours, type and spacing. Every colour has one meaning. */
+
+:root {
+  /* surfaces: graphite blue, not black */
+  --bg: #17202a;
+  --surface: #1e2935;
+  --surface-2: #253241;
+  --rule: #31404f;
+
+  /* ink */
+  --ink: #edf1f4;
+  --ink-2: #b3bfca;
+  --ink-3: #7f8d9a;
+
+  /* meaning */
+  --ok: #5ccaa6;          /* normal */
+  --jam: #f07261;         /* the shared line is jammed */
+  --fault: #a596f5;       /* a fault: slowing a device would not help */
+  --agent: #f2ab3c;       /* the agent acting */
+  --watch: #e5d36f;       /* above normal, not yet a problem */
+
+  --jam-wash: rgba(240, 114, 97, .16);
+  --fault-wash: rgba(165, 150, 245, .16);
+  --agent-wash: rgba(242, 171, 60, .16);
+
+  /* type */
+  --font: "Archivo", "Segoe UI", system-ui, sans-serif;
+  --t-xs: 12px;
+  --t-sm: 13.5px;
+  --t-md: 15px;
+  --t-lg: 19px;
+  --t-xl: 28px;
+  --t-hero: clamp(28px, 3.3vw, 46px);
+
+  /* space and shape */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
+  --r-panel: 14px;
+  --r-chip: 7px;
+}

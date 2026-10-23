@@ -73,9 +73,16 @@ async function start() {
   addEventListener('hashchange', route);
   route();
   let last = performance.now(), n = 0;
+  const showClock = () => {
+    const replay = STATE.src.kind === 'replay' && STATE.src.at;
+    $('#nowClock').textContent = replay ? `${clock(STATE.src.at)} in the run` : clock(Date.now() / 1000);
+    $('#nowClock').title = replay ? 'Time in the recorded run' : 'Time now on this computer';
+  };
+  showClock();
   setInterval(async () => {
     const t = performance.now(), dt = (t - last) / 1000; last = t;
     tickReplay(dt);
+    showClock();
     if (busy) return;
     busy = true;
     n += 1;

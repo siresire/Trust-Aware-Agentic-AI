@@ -62,3 +62,5 @@ main { max-width: 1480px; margin: 0 auto; padding: var(--s6) var(--s6) var(--s7)
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+.nowclock { font-variant-numeric: tabular-nums; font-weight: 650; color: var(--ink); padding-left: var(--s3); margin-left: var(--s1); border-left: 1px solid var(--rule); }

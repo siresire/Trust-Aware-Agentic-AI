@@ -1,7 +1,7 @@
 {
   "protected": {
     "camera": "high",
-    "doorbell": "medium",
+    "doorbell": "high",
     "lock": "high",
     "thermostat": "medium",
     "speaker": "low",
@@ -10,7 +10,8 @@
   },
   "may_slow": [
     "phone",
-    "tv"
+    "tv",
+    "laptop"
   ],
   "min_rate_mbit": 2,
   "max_slow_s": 60,
